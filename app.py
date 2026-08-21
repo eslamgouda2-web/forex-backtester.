@@ -1,10 +1,14 @@
 import streamlit as st
 
+import pandas as pd
+
+from data_engine import load_csv, prepare_data, validate_data
+
 # =========================================================
 
 # FOREX BACKTESTER
 
-# Foundation V2
+# Foundation V3 + DATA ENGINE
 
 # =========================================================
 
@@ -58,8 +62,6 @@ TEXT = {
 
         "reports": "التقارير",
 
-        "settings": "الإعدادات",
-
         "symbol": "الزوج",
 
         "timeframe": "الفريم",
@@ -86,10 +88,6 @@ TEXT = {
 
         "max_dd": "أقصى تراجع",
 
-        "language": "اللغة",
-
-        "coming": "سيتم إضافة محرك الباك تيست هنا.",
-
         "data_engine": "محرك البيانات",
 
         "strategy_engine": "محرك الاستراتيجية",
@@ -108,7 +106,47 @@ TEXT = {
 
         "trailing": "Trailing Stop",
 
-        "ready": "البرنامج جاهز لبناء محرك الاختبار."
+        "data_source": "مصدر البيانات",
+
+        "upload_csv": "📁 رفع CSV",
+
+        "online_data": "🌐 بيانات Online",
+
+        "mt5": "🔌 MetaTrader 5",
+
+        "upload_file": "ارفع ملف بيانات السوق",
+
+        "load_data": "تحميل البيانات",
+
+        "data_loaded": "تم تحميل البيانات بنجاح",
+
+        "candles": "عدد الشموع",
+
+        "first_candle": "أول شمعة",
+
+        "last_candle": "آخر شمعة",
+
+        "missing_bars": "الشموع الناقصة",
+
+        "duplicates": "الشموع المكررة",
+
+        "invalid_ohlc": "شموع OHLC غير صحيحة",
+
+        "data_preview": "معاينة البيانات",
+
+        "price_chart": "الرسم البياني",
+
+        "close_price": "سعر الإغلاق",
+
+        "coming_soon": "Coming Soon",
+
+        "valid": "البيانات صالحة",
+
+        "invalid": "البيانات غير صالحة",
+
+        "ready": "البرنامج جاهز لبناء محرك الباك تيست.",
+
+        "coming_engine": "سيتم إضافة هذا المحرك في المرحلة التالية."
 
     },
 
@@ -125,8 +163,6 @@ TEXT = {
         "backtest": "Backtest",
 
         "reports": "Reports",
-
-        "settings": "Settings",
 
         "symbol": "Symbol",
 
@@ -154,10 +190,6 @@ TEXT = {
 
         "max_dd": "Max Drawdown",
 
-        "language": "Language",
-
-        "coming": "The backtest engine will be added here.",
-
         "data_engine": "Data Engine",
 
         "strategy_engine": "Strategy Engine",
@@ -176,7 +208,47 @@ TEXT = {
 
         "trailing": "Trailing Stop",
 
-        "ready": "The platform is ready for the backtest engine."
+        "data_source": "Data Source",
+
+        "upload_csv": "📁 Upload CSV",
+
+        "online_data": "🌐 Online Data",
+
+        "mt5": "🔌 MetaTrader 5",
+
+        "upload_file": "Upload your market data file",
+
+        "load_data": "Load Data",
+
+        "data_loaded": "Data loaded successfully",
+
+        "candles": "Candles",
+
+        "first_candle": "First Candle",
+
+        "last_candle": "Last Candle",
+
+        "missing_bars": "Missing Bars",
+
+        "duplicates": "Duplicate Candles",
+
+        "invalid_ohlc": "Invalid OHLC Candles",
+
+        "data_preview": "Data Preview",
+
+        "price_chart": "Price Chart",
+
+        "close_price": "Close Price",
+
+        "coming_soon": "Coming Soon",
+
+        "valid": "Data is valid",
+
+        "invalid": "Data is invalid",
+
+        "ready": "The platform is ready for the backtest engine.",
+
+        "coming_engine": "This engine will be added in the next stage."
 
     },
 
@@ -193,8 +265,6 @@ TEXT = {
         "backtest": "बैकटेस्ट",
 
         "reports": "रिपोर्ट",
-
-        "settings": "सेटिंग्स",
 
         "symbol": "पेयर",
 
@@ -222,10 +292,6 @@ TEXT = {
 
         "max_dd": "अधिकतम ड्रॉडाउन",
 
-        "language": "भाषा",
-
-        "coming": "बैकटेस्ट इंजन यहाँ जोड़ा जाएगा.",
-
         "data_engine": "डेटा इंजन",
 
         "strategy_engine": "रणनीति इंजन",
@@ -244,7 +310,47 @@ TEXT = {
 
         "trailing": "Trailing Stop",
 
-        "ready": "प्लेटफ़ॉर्म बैकटेस्ट इंजन के लिए तैयार है."
+        "data_source": "डेटा स्रोत",
+
+        "upload_csv": "📁 CSV अपलोड",
+
+        "online_data": "🌐 ऑनलाइन डेटा",
+
+        "mt5": "🔌 MetaTrader 5",
+
+        "upload_file": "मार्केट डेटा फ़ाइल अपलोड करें",
+
+        "load_data": "डेटा लोड करें",
+
+        "data_loaded": "डेटा सफलतापूर्वक लोड हुआ",
+
+        "candles": "कैंडल्स",
+
+        "first_candle": "पहली कैंडल",
+
+        "last_candle": "अंतिम कैंडल",
+
+        "missing_bars": "गुम बार",
+
+        "duplicates": "डुप्लिकेट कैंडल्स",
+
+        "invalid_ohlc": "अमान्य OHLC कैंडल्स",
+
+        "data_preview": "डेटा प्रीव्यू",
+
+        "price_chart": "प्राइस चार्ट",
+
+        "close_price": "क्लोज़ प्राइस",
+
+        "coming_soon": "Coming Soon",
+
+        "valid": "डेटा मान्य है",
+
+        "invalid": "डेटा अमान्य है",
+
+        "ready": "प्लेटफ़ॉर्म बैकटेस्ट इंजन के लिए तैयार है।",
+
+        "coming_engine": "यह इंजन अगले चरण में जोड़ा जाएगा।"
 
     },
 
@@ -261,8 +367,6 @@ TEXT = {
         "backtest": "Backtest",
 
         "reports": "Rapports",
-
-        "settings": "Paramètres",
 
         "symbol": "Paire",
 
@@ -290,10 +394,6 @@ TEXT = {
 
         "max_dd": "Drawdown maximum",
 
-        "language": "Langue",
-
-        "coming": "Le moteur de backtest sera ajouté ici.",
-
         "data_engine": "Moteur de données",
 
         "strategy_engine": "Moteur de stratégie",
@@ -312,7 +412,47 @@ TEXT = {
 
         "trailing": "Trailing Stop",
 
-        "ready": "La plateforme est prête pour le moteur de backtest."
+        "data_source": "Source des données",
+
+        "upload_csv": "📁 Importer CSV",
+
+        "online_data": "🌐 Données Online",
+
+        "mt5": "🔌 MetaTrader 5",
+
+        "upload_file": "Importer votre fichier de données",
+
+        "load_data": "Charger les données",
+
+        "data_loaded": "Données chargées avec succès",
+
+        "candles": "Bougies",
+
+        "first_candle": "Première bougie",
+
+        "last_candle": "Dernière bougie",
+
+        "missing_bars": "Barres manquantes",
+
+        "duplicates": "Bougies en double",
+
+        "invalid_ohlc": "Bougies OHLC invalides",
+
+        "data_preview": "Aperçu des données",
+
+        "price_chart": "Graphique des prix",
+
+        "close_price": "Prix de clôture",
+
+        "coming_soon": "Coming Soon",
+
+        "valid": "Données valides",
+
+        "invalid": "Données invalides",
+
+        "ready": "La plateforme est prête pour le moteur de backtest.",
+
+        "coming_engine": "Ce moteur sera ajouté à l'étape suivante."
 
     },
 
@@ -329,8 +469,6 @@ TEXT = {
         "backtest": "回测",
 
         "reports": "报告",
-
-        "settings": "设置",
 
         "symbol": "交易品种",
 
@@ -358,10 +496,6 @@ TEXT = {
 
         "max_dd": "最大回撤",
 
-        "language": "语言",
-
-        "coming": "回测引擎将在这里添加。",
-
         "data_engine": "数据引擎",
 
         "strategy_engine": "策略引擎",
@@ -380,7 +514,47 @@ TEXT = {
 
         "trailing": "Trailing Stop",
 
-        "ready": "平台已经准备好添加回测引擎。"
+        "data_source": "数据来源",
+
+        "upload_csv": "📁 上传 CSV",
+
+        "online_data": "🌐 在线数据",
+
+        "mt5": "🔌 MetaTrader 5",
+
+        "upload_file": "上传市场数据文件",
+
+        "load_data": "加载数据",
+
+        "data_loaded": "数据加载成功",
+
+        "candles": "K线数量",
+
+        "first_candle": "第一根K线",
+
+        "last_candle": "最后一根K线",
+
+        "missing_bars": "缺失K线",
+
+        "duplicates": "重复K线",
+
+        "invalid_ohlc": "无效 OHLC K线",
+
+        "data_preview": "数据预览",
+
+        "price_chart": "价格图表",
+
+        "close_price": "收盘价",
+
+        "coming_soon": "Coming Soon",
+
+        "valid": "数据有效",
+
+        "invalid": "数据无效",
+
+        "ready": "平台已准备好添加回测引擎。",
+
+        "coming_engine": "该引擎将在下一阶段添加。"
 
     },
 
@@ -397,8 +571,6 @@ TEXT = {
         "backtest": "バックテスト",
 
         "reports": "レポート",
-
-        "settings": "設定",
 
         "symbol": "通貨ペア",
 
@@ -426,10 +598,6 @@ TEXT = {
 
         "max_dd": "最大ドローダウン",
 
-        "language": "言語",
-
-        "coming": "ここにバックテストエンジンを追加します。",
-
         "data_engine": "データエンジン",
 
         "strategy_engine": "戦略エンジン",
@@ -448,7 +616,47 @@ TEXT = {
 
         "trailing": "Trailing Stop",
 
-        "ready": "バックテストエンジンを追加する準備ができました。"
+        "data_source": "データソース",
+
+        "upload_csv": "📁 CSVアップロード",
+
+        "online_data": "🌐 オンラインデータ",
+
+        "mt5": "🔌 MetaTrader 5",
+
+        "upload_file": "市場データファイルをアップロード",
+
+        "load_data": "データを読み込む",
+
+        "data_loaded": "データの読み込みに成功しました",
+
+        "candles": "ローソク足数",
+
+        "first_candle": "最初のローソク足",
+
+        "last_candle": "最後のローソク足",
+
+        "missing_bars": "欠損バー",
+
+        "duplicates": "重複ローソク足",
+
+        "invalid_ohlc": "無効なOHLC",
+
+        "data_preview": "データプレビュー",
+
+        "price_chart": "価格チャート",
+
+        "close_price": "終値",
+
+        "coming_soon": "Coming Soon",
+
+        "valid": "データは有効です",
+
+        "invalid": "データが無効です",
+
+        "ready": "バックテストエンジンを追加する準備ができました。",
+
+        "coming_engine": "このエンジンは次の段階で追加されます。"
 
     },
 
@@ -465,8 +673,6 @@ TEXT = {
         "backtest": "Бэктест",
 
         "reports": "Отчёты",
-
-        "settings": "Настройки",
 
         "symbol": "Инструмент",
 
@@ -494,10 +700,6 @@ TEXT = {
 
         "max_dd": "Максимальная просадка",
 
-        "language": "Язык",
-
-        "coming": "Здесь будет добавлен движок бэктестинга.",
-
         "data_engine": "Движок данных",
 
         "strategy_engine": "Движок стратегий",
@@ -516,7 +718,47 @@ TEXT = {
 
         "trailing": "Trailing Stop",
 
-        "ready": "Платформа готова для добавления движка бэктестинга."
+        "data_source": "Источник данных",
+
+        "upload_csv": "📁 Загрузить CSV",
+
+        "online_data": "🌐 Онлайн-данные",
+
+        "mt5": "🔌 MetaTrader 5",
+
+        "upload_file": "Загрузите файл рыночных данных",
+
+        "load_data": "Загрузить данные",
+
+        "data_loaded": "Данные успешно загружены",
+
+        "candles": "Количество свечей",
+
+        "first_candle": "Первая свеча",
+
+        "last_candle": "Последняя свеча",
+
+        "missing_bars": "Пропущенные бары",
+
+        "duplicates": "Дубликаты свечей",
+
+        "invalid_ohlc": "Некорректные OHLC свечи",
+
+        "data_preview": "Предпросмотр данных",
+
+        "price_chart": "График цены",
+
+        "close_price": "Цена закрытия",
+
+        "coming_soon": "Coming Soon",
+
+        "valid": "Данные корректны",
+
+        "invalid": "Данные некорректны",
+
+        "ready": "Платформа готова для добавления движка бэктестинга.",
+
+        "coming_engine": "Этот движок будет добавлен на следующем этапе."
 
     }
 
@@ -524,13 +766,21 @@ TEXT = {
 
 # =========================================================
 
-# SAVE LANGUAGE IN SESSION
+# SESSION STATE
 
 # =========================================================
 
 if "language" not in st.session_state:
 
     st.session_state.language = "ar"
+
+if "market_data" not in st.session_state:
+
+    st.session_state.market_data = None
+
+if "data_info" not in st.session_state:
+
+    st.session_state.data_info = None
 
 current_language = st.session_state.language
 
@@ -592,7 +842,11 @@ with top_right:
 
         list(LANGUAGES.keys()),
 
-        index=list(LANGUAGES.values()).index(current_language),
+        index=list(LANGUAGES.values()).index(
+
+            current_language
+
+        ),
 
         label_visibility="collapsed"
 
@@ -664,39 +918,19 @@ with tab2:
 
     st.subheader(t["strategy_builder"])
 
-    st.write(
+    st.write("🧠 " + t["price_action"])
 
-        "🧠 " + t["price_action"]
+    st.write("📊 " + t["indicators"])
 
-    )
+    st.write("〽️ " + t["zigzag"])
 
-    st.write(
+    st.write("🔄 " + t["retest"])
 
-        "📊 " + t["indicators"]
-
-    )
-
-    st.write(
-
-        "〽️ " + t["zigzag"]
-
-    )
-
-    st.write(
-
-        "🔄 " + t["retest"]
-
-    )
-
-    st.write(
-
-        "📈 " + t["trailing"]
-
-    )
+    st.write("📈 " + t["trailing"])
 
     st.divider()
 
-    st.info(t["coming"])
+    st.info(t["coming_engine"])
 
 # =========================================================
 
@@ -708,69 +942,299 @@ with tab3:
 
     st.header(t["backtest"])
 
-    col1, col2 = st.columns(2)
+    # -----------------------------------------------------
 
-    with col1:
+    # MARKET DATA
 
-        symbol = st.selectbox(
+    # -----------------------------------------------------
 
-            t["symbol"],
+    st.subheader("📊 Market Data")
 
-            [
+    source = st.selectbox(
 
-                "EUR/USD",
+        t["data_source"],
 
-                "GBP/USD",
+        [
 
-                "USD/JPY",
+            t["upload_csv"],
 
-                "AUD/USD",
+            t["online_data"],
 
-                "USD/CAD",
+            t["mt5"]
 
-                "XAU/USD"
+        ]
 
-            ]
+    )
 
-        )
+    # -----------------------------------------------------
 
-        timeframe = st.selectbox(
+    # CSV SOURCE
 
-            t["timeframe"],
+    # -----------------------------------------------------
 
-            [
+    if source == t["upload_csv"]:
 
-                "1 Minute",
+        uploaded_file = st.file_uploader(
 
-                "5 Minutes",
+            t["upload_file"],
 
-                "15 Minutes",
-
-                "30 Minutes",
-
-                "1 Hour",
-
-                "4 Hours",
-
-                "Daily"
-
-            ]
+            type=["csv"]
 
         )
 
-    with col2:
+        if uploaded_file is not None:
 
-        start_date = st.date_input(
+            if st.button(
 
-            t["start"]
+                "📥 " + t["load_data"],
+
+                use_container_width=True
+
+            ):
+
+                df, error = load_csv(
+
+                    uploaded_file
+
+                )
+
+                if error:
+
+                    st.error(error)
+
+                else:
+
+                    prepared_df, info = prepare_data(
+
+                        df
+
+                    )
+
+                    if prepared_df is None:
+
+                        st.error(
+
+                            info.get(
+
+                                "message",
+
+                                "Invalid data"
+
+                            )
+
+                        )
+
+                    else:
+
+                        valid, message = validate_data(
+
+                            prepared_df
+
+                        )
+
+                        if valid:
+
+                            st.session_state.market_data = (
+
+                                prepared_df
+
+                            )
+
+                            st.session_state.data_info = (
+
+                                info
+
+                            )
+
+                            st.success(
+
+                                "✓ " + t["data_loaded"]
+
+                            )
+
+                        else:
+
+                            st.error(message)
+
+    # -----------------------------------------------------
+
+    # ONLINE SOURCE
+
+    # -----------------------------------------------------
+
+    elif source == t["online_data"]:
+
+        st.info(
+
+            "🌐 " + t["coming_soon"]
 
         )
 
-        end_date = st.date_input(
+    # -----------------------------------------------------
 
-            t["end"]
+    # MT5 SOURCE
+
+    # -----------------------------------------------------
+
+    elif source == t["mt5"]:
+
+        st.info(
+
+            "🔌 MetaTrader 5 — "
+
+            + t["coming_soon"]
 
         )
+
+    # -----------------------------------------------------
+
+    # DATA RESULTS
+
+    # -----------------------------------------------------
+
+    if st.session_state.market_data is not None:
+
+        df = st.session_state.market_data
+
+        info = st.session_state.data_info
+
+        st.divider()
+
+        st.subheader(
+
+            "✓ " + t["data_loaded"]
+
+        )
+
+        c1, c2, c3 = st.columns(3)
+
+        c1.metric(
+
+            t["candles"],
+
+            f'{info["candles"]:,}'
+
+        )
+
+        c2.metric(
+
+            t["missing_bars"],
+
+            f'{info["missing_bars"]:,}'
+
+        )
+
+        c3.metric(
+
+            t["duplicates"],
+
+            f'{info["duplicates_removed"]:,}'
+
+        )
+
+        c4, c5 = st.columns(2)
+
+        c4.metric(
+
+            t["first_candle"],
+
+            info["first_candle"]
+
+        )
+
+        c5.metric(
+
+            t["last_candle"],
+
+            info["last_candle"]
+
+        )
+
+        st.divider()
+
+        # -------------------------------------------------
+
+        # DATA VALIDATION
+
+        # -------------------------------------------------
+
+        if info["invalid_ohlc"] == 0:
+
+            st.success(
+
+                "✓ " + t["valid"]
+
+            )
+
+        else:
+
+            st.warning(
+
+                f'{t["invalid_ohlc"]}: '
+
+                f'{info["invalid_ohlc"]}'
+
+            )
+
+        # -------------------------------------------------
+
+        # PREVIEW
+
+        # -------------------------------------------------
+
+        st.subheader(
+
+            t["data_preview"]
+
+        )
+
+        st.dataframe(
+
+            df.head(20),
+
+            use_container_width=True
+
+        )
+
+        # -------------------------------------------------
+
+        # PRICE CHART
+
+        # -------------------------------------------------
+
+        if "close" in df.columns:
+
+            st.subheader(
+
+                t["price_chart"]
+
+            )
+
+            chart_data = df[
+
+                ["datetime", "close"]
+
+            ].copy()
+
+            chart_data = chart_data.set_index(
+
+                "datetime"
+
+            )
+
+            st.line_chart(
+
+                chart_data,
+
+                y="close"
+
+            )
+
+    # -----------------------------------------------------
+
+    # STRATEGY SELECTION
+
+    # -----------------------------------------------------
 
     st.divider()
 
@@ -792,6 +1256,14 @@ with tab3:
 
     )
 
+    st.divider()
+
+    # -----------------------------------------------------
+
+    # BACKTEST BUTTON
+
+    # -----------------------------------------------------
+
     if st.button(
 
         "🚀 " + t["run"],
@@ -800,7 +1272,23 @@ with tab3:
 
     ):
 
-        st.warning(t["coming"])
+        if st.session_state.market_data is None:
+
+            st.warning(
+
+                "⚠️ Please load market data first."
+
+            )
+
+        else:
+
+            st.info(
+
+                "Backtest engine will use "
+
+                "the validated market data."
+
+            )
 
 # =========================================================
 
