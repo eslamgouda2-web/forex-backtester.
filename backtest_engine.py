@@ -591,30 +591,53 @@ class BacktestEngine:
             # Strategy signal
 
             # -----------------------------------------------
+              try:
 
-            try:
+                   if hasattr(strategy, "generate_signal"):
 
-                signal = strategy(
+                    signal = strategy.generate_signal(
 
-                    df,
+                        df,
 
-                    i
+                        i
 
-                )
+                        )
 
+                   elif isinstance(strategy, type):
+
+                     strategy_instance = strategy()
+
+                     signal = strategy_instance.generate_signal(
+
+                         df,
+
+                         i
+
+                         )
+
+                    else:
+
+                         signal = strategy(
+
+                             df,
+
+                             i
+
+                             )
+   
             except TypeError:
 
-                signal = strategy(
+                 signal = strategy(
 
-                    row,
+                      row,
 
-                    i
+                      i
 
-                )
+                  )
 
-            if signal is None:
+             if signal is None:
 
-                signal = {}
+                  signal = {}
 
             # -----------------------------------------------
 
