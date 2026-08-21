@@ -4,11 +4,15 @@ import pandas as pd
 
 from data_engine import load_csv, prepare_data, validate_data
 
+from backtest_engine import BacktestEngine
+
+from strategy_engine import ExamplePriceActionStrategy
+
 # =========================================================
 
 # FOREX BACKTESTER
 
-# Foundation V3 + DATA ENGINE
+# APP V4 + BACKTEST ENGINE
 
 # =========================================================
 
@@ -30,8 +34,6 @@ st.set_page_config(
 
 LANGUAGES = {
 
-    "العربية": "ar",
-
     "English": "en",
 
     "हिन्दी": "hi",
@@ -42,7 +44,9 @@ LANGUAGES = {
 
     "日本語": "ja",
 
-    "Русский": "ru"
+    "Русский": "ru",
+
+    "العربية": "ar"
 
 }
 
@@ -62,14 +66,6 @@ TEXT = {
 
         "reports": "التقارير",
 
-        "symbol": "الزوج",
-
-        "timeframe": "الفريم",
-
-        "start": "تاريخ البداية",
-
-        "end": "تاريخ النهاية",
-
         "strategy": "الاستراتيجية",
 
         "strategy_builder": "منشئ الاستراتيجيات",
@@ -84,7 +80,7 @@ TEXT = {
 
         "profit_factor": "معامل الربحية",
 
-        "net_r": "صافي R",
+        "net_r": "صافي الربح",
 
         "max_dd": "أقصى تراجع",
 
@@ -144,9 +140,7 @@ TEXT = {
 
         "invalid": "البيانات غير صالحة",
 
-        "ready": "البرنامج جاهز لبناء محرك الباك تيست.",
-
-        "coming_engine": "سيتم إضافة هذا المحرك في المرحلة التالية."
+        "ready": "البرنامج جاهز لاختبار الاستراتيجيات."
 
     },
 
@@ -164,14 +158,6 @@ TEXT = {
 
         "reports": "Reports",
 
-        "symbol": "Symbol",
-
-        "timeframe": "Timeframe",
-
-        "start": "Start Date",
-
-        "end": "End Date",
-
         "strategy": "Strategy",
 
         "strategy_builder": "Strategy Builder",
@@ -186,7 +172,7 @@ TEXT = {
 
         "profit_factor": "Profit Factor",
 
-        "net_r": "Net R",
+        "net_r": "Net Profit",
 
         "max_dd": "Max Drawdown",
 
@@ -246,9 +232,7 @@ TEXT = {
 
         "invalid": "Data is invalid",
 
-        "ready": "The platform is ready for the backtest engine.",
-
-        "coming_engine": "This engine will be added in the next stage."
+        "ready": "The platform is ready to test strategies."
 
     },
 
@@ -266,14 +250,6 @@ TEXT = {
 
         "reports": "रिपोर्ट",
 
-        "symbol": "पेयर",
-
-        "timeframe": "टाइमफ्रेम",
-
-        "start": "शुरुआत",
-
-        "end": "अंत",
-
         "strategy": "रणनीति",
 
         "strategy_builder": "रणनीति बिल्डर",
@@ -288,7 +264,7 @@ TEXT = {
 
         "profit_factor": "प्रॉफिट फैक्टर",
 
-        "net_r": "नेट R",
+        "net_r": "नेट प्रॉफिट",
 
         "max_dd": "अधिकतम ड्रॉडाउन",
 
@@ -348,9 +324,7 @@ TEXT = {
 
         "invalid": "डेटा अमान्य है",
 
-        "ready": "प्लेटफ़ॉर्म बैकटेस्ट इंजन के लिए तैयार है।",
-
-        "coming_engine": "यह इंजन अगले चरण में जोड़ा जाएगा।"
+        "ready": "प्लेटफ़ॉर्म रणनीतियों के परीक्षण के लिए तैयार है."
 
     },
 
@@ -368,14 +342,6 @@ TEXT = {
 
         "reports": "Rapports",
 
-        "symbol": "Paire",
-
-        "timeframe": "Unité de temps",
-
-        "start": "Date de début",
-
-        "end": "Date de fin",
-
         "strategy": "Stratégie",
 
         "strategy_builder": "Constructeur de stratégies",
@@ -390,7 +356,7 @@ TEXT = {
 
         "profit_factor": "Profit Factor",
 
-        "net_r": "R net",
+        "net_r": "Profit net",
 
         "max_dd": "Drawdown maximum",
 
@@ -450,9 +416,7 @@ TEXT = {
 
         "invalid": "Données invalides",
 
-        "ready": "La plateforme est prête pour le moteur de backtest.",
-
-        "coming_engine": "Ce moteur sera ajouté à l'étape suivante."
+        "ready": "La plateforme est prête à tester les stratégies."
 
     },
 
@@ -470,14 +434,6 @@ TEXT = {
 
         "reports": "报告",
 
-        "symbol": "交易品种",
-
-        "timeframe": "时间周期",
-
-        "start": "开始日期",
-
-        "end": "结束日期",
-
         "strategy": "策略",
 
         "strategy_builder": "策略构建器",
@@ -492,7 +448,7 @@ TEXT = {
 
         "profit_factor": "盈利因子",
 
-        "net_r": "净 R",
+        "net_r": "净利润",
 
         "max_dd": "最大回撤",
 
@@ -538,7 +494,7 @@ TEXT = {
 
         "duplicates": "重复K线",
 
-        "invalid_ohlc": "无效 OHLC K线",
+        "invalid_ohlc": "无效 OHLC",
 
         "data_preview": "数据预览",
 
@@ -552,9 +508,7 @@ TEXT = {
 
         "invalid": "数据无效",
 
-        "ready": "平台已准备好添加回测引擎。",
-
-        "coming_engine": "该引擎将在下一阶段添加。"
+        "ready": "平台已准备好测试策略。"
 
     },
 
@@ -572,14 +526,6 @@ TEXT = {
 
         "reports": "レポート",
 
-        "symbol": "通貨ペア",
-
-        "timeframe": "時間足",
-
-        "start": "開始日",
-
-        "end": "終了日",
-
         "strategy": "戦略",
 
         "strategy_builder": "ストラテジービルダー",
@@ -594,7 +540,7 @@ TEXT = {
 
         "profit_factor": "プロフィットファクター",
 
-        "net_r": "純 R",
+        "net_r": "純利益",
 
         "max_dd": "最大ドローダウン",
 
@@ -654,9 +600,7 @@ TEXT = {
 
         "invalid": "データが無効です",
 
-        "ready": "バックテストエンジンを追加する準備ができました。",
-
-        "coming_engine": "このエンジンは次の段階で追加されます。"
+        "ready": "プラットフォームは戦略テストの準備ができています。"
 
     },
 
@@ -674,14 +618,6 @@ TEXT = {
 
         "reports": "Отчёты",
 
-        "symbol": "Инструмент",
-
-        "timeframe": "Таймфрейм",
-
-        "start": "Дата начала",
-
-        "end": "Дата окончания",
-
         "strategy": "Стратегия",
 
         "strategy_builder": "Конструктор стратегий",
@@ -696,7 +632,7 @@ TEXT = {
 
         "profit_factor": "Profit Factor",
 
-        "net_r": "Чистый R",
+        "net_r": "Чистая прибыль",
 
         "max_dd": "Максимальная просадка",
 
@@ -742,7 +678,7 @@ TEXT = {
 
         "duplicates": "Дубликаты свечей",
 
-        "invalid_ohlc": "Некорректные OHLC свечи",
+        "invalid_ohlc": "Некорректные OHLC",
 
         "data_preview": "Предпросмотр данных",
 
@@ -756,9 +692,7 @@ TEXT = {
 
         "invalid": "Данные некорректны",
 
-        "ready": "Платформа готова для добавления движка бэктестинга.",
-
-        "coming_engine": "Этот движок будет добавлен на следующем этапе."
+        "ready": "Платформа готова к тестированию стратегий."
 
     }
 
@@ -772,7 +706,7 @@ TEXT = {
 
 if "language" not in st.session_state:
 
-    st.session_state.language = "ar"
+    st.session_state.language = "en"
 
 if "market_data" not in st.session_state:
 
@@ -782,13 +716,17 @@ if "data_info" not in st.session_state:
 
     st.session_state.data_info = None
 
+if "backtest_results" not in st.session_state:
+
+    st.session_state.backtest_results = None
+
 current_language = st.session_state.language
 
 t = TEXT[current_language]
 
 # =========================================================
 
-# RTL SUPPORT
+# RTL
 
 # =========================================================
 
@@ -928,10 +866,6 @@ with tab2:
 
     st.write("📈 " + t["trailing"])
 
-    st.divider()
-
-    st.info(t["coming_engine"])
-
 # =========================================================
 
 # BACKTEST
@@ -942,11 +876,11 @@ with tab3:
 
     st.header(t["backtest"])
 
-    # -----------------------------------------------------
+    # =====================================================
 
     # MARKET DATA
 
-    # -----------------------------------------------------
+    # =====================================================
 
     st.subheader("📊 Market Data")
 
@@ -966,11 +900,11 @@ with tab3:
 
     )
 
-    # -----------------------------------------------------
+    # =====================================================
 
-    # CSV SOURCE
+    # CSV
 
-    # -----------------------------------------------------
+    # =====================================================
 
     if source == t["upload_csv"]:
 
@@ -1046,6 +980,8 @@ with tab3:
 
                             )
 
+                            st.session_state.backtest_results = None
+
                             st.success(
 
                                 "✓ " + t["data_loaded"]
@@ -1056,11 +992,11 @@ with tab3:
 
                             st.error(message)
 
-    # -----------------------------------------------------
+    # =====================================================
 
-    # ONLINE SOURCE
+    # ONLINE
 
-    # -----------------------------------------------------
+    # =====================================================
 
     elif source == t["online_data"]:
 
@@ -1070,11 +1006,11 @@ with tab3:
 
         )
 
-    # -----------------------------------------------------
+    # =====================================================
 
-    # MT5 SOURCE
+    # MT5
 
-    # -----------------------------------------------------
+    # =====================================================
 
     elif source == t["mt5"]:
 
@@ -1086,11 +1022,11 @@ with tab3:
 
         )
 
-    # -----------------------------------------------------
+    # =====================================================
 
     # DATA RESULTS
 
-    # -----------------------------------------------------
+    # =====================================================
 
     if st.session_state.market_data is not None:
 
@@ -1152,12 +1088,6 @@ with tab3:
 
         st.divider()
 
-        # -------------------------------------------------
-
-        # DATA VALIDATION
-
-        # -------------------------------------------------
-
         if info["invalid_ohlc"] == 0:
 
             st.success(
@@ -1176,11 +1106,11 @@ with tab3:
 
             )
 
-        # -------------------------------------------------
+        # =================================================
 
-        # PREVIEW
+        # DATA PREVIEW
 
-        # -------------------------------------------------
+        # =================================================
 
         st.subheader(
 
@@ -1196,11 +1126,11 @@ with tab3:
 
         )
 
-        # -------------------------------------------------
+        # =================================================
 
         # PRICE CHART
 
-        # -------------------------------------------------
+        # =================================================
 
         if "close" in df.columns:
 
@@ -1230,39 +1160,105 @@ with tab3:
 
             )
 
-    # -----------------------------------------------------
+    # =====================================================
 
-    # STRATEGY SELECTION
+    # STRATEGY
 
-    # -----------------------------------------------------
+    # =====================================================
 
     st.divider()
 
     st.subheader(t["strategy"])
 
-    strategy = st.selectbox(
+    strategy_name = st.selectbox(
 
         t["strategy"],
 
         [
 
-            "ZigZag Break & Retest",
-
-            t["price_action"],
-
-            t["indicators"]
+            "Example Price Action Strategy"
 
         ]
 
     )
 
+    # =====================================================
+
+    # BACKTEST SETTINGS
+
+    # =====================================================
+
     st.divider()
 
-    # -----------------------------------------------------
+    st.subheader("⚙️ Backtest Settings")
 
-    # BACKTEST BUTTON
+    c1, c2, c3 = st.columns(3)
 
-    # -----------------------------------------------------
+    with c1:
+
+        initial_balance = st.number_input(
+
+            "Initial Balance",
+
+            min_value=100.0,
+
+            value=10000.0,
+
+            step=100.0
+
+        )
+
+    with c2:
+
+        risk_percent = st.number_input(
+
+            "Risk Per Trade (%)",
+
+            min_value=0.01,
+
+            max_value=100.0,
+
+            value=1.0,
+
+            step=0.1
+
+        )
+
+    with c3:
+
+        commission = st.number_input(
+
+            "Commission",
+
+            min_value=0.0,
+
+            value=0.0,
+
+            step=0.0001,
+
+            format="%.6f"
+
+        )
+
+    slippage = st.number_input(
+
+        "Slippage",
+
+        min_value=0.0,
+
+        value=0.0,
+
+        step=0.00001,
+
+        format="%.5f"
+
+    )
+
+    # =====================================================
+
+    # RUN BACKTEST
+
+    # =====================================================
 
     if st.button(
 
@@ -1282,13 +1278,127 @@ with tab3:
 
         else:
 
-            st.info(
+            try:
 
-                "Backtest engine will use "
+                market_df = (
 
-                "the validated market data."
+                    st.session_state.market_data.copy()
 
-            )
+                )
+
+                # -----------------------------------------
+
+                # Create strategy
+
+                # -----------------------------------------
+
+                strategy = ExamplePriceActionStrategy()
+
+                # -----------------------------------------
+
+                # Prepare indicators
+
+                # -----------------------------------------
+
+                prepared_df = strategy.prepare(
+
+                    market_df
+
+                )
+
+                # -----------------------------------------
+
+                # Create backtest engine
+
+                # -----------------------------------------
+
+                engine = BacktestEngine(
+
+                    initial_balance=initial_balance,
+
+                    risk_percent=risk_percent,
+
+                    commission=commission,
+
+                    slippage=slippage,
+
+                    allow_long=True,
+
+                    allow_short=True,
+
+                    one_position_only=True
+
+                )
+
+                # -----------------------------------------
+
+                # Run backtest
+
+                # -----------------------------------------
+
+                results = engine.run(
+
+                    prepared_df,
+
+                    strategy
+
+                )
+
+                # -----------------------------------------
+
+                # Store results
+
+                # -----------------------------------------
+
+                st.session_state.backtest_results = (
+
+                    results
+
+                )
+
+                st.success(
+
+                    "✅ Backtest completed successfully."
+
+                )
+
+                # -----------------------------------------
+
+                # Show quick result
+
+                # -----------------------------------------
+
+                st.info(
+
+                    f"Trades: {results['total_trades']} | "
+
+                    f"Win Rate: {results['win_rate']:.2f}% | "
+
+                    f"Profit Factor: "
+
+                    f"{results['profit_factor']:.2f}"
+
+                    if results["profit_factor"] != float("inf")
+
+                    else
+
+                    f"Trades: {results['total_trades']} | "
+
+                    f"Win Rate: {results['win_rate']:.2f}% | "
+
+                    f"Profit Factor: ∞"
+
+                )
+
+            except Exception as e:
+
+                st.error(
+
+                    "❌ Backtest Error"
+
+                )
+
+                st.exception(e)
 
 # =========================================================
 
@@ -1300,14 +1410,220 @@ with tab4:
 
     st.header(t["reports"])
 
-    c1, c2, c3, c4, c5 = st.columns(5)
+    results = st.session_state.backtest_results
 
-    c1.metric(t["trades"], "—")
+    # =====================================================
 
-    c2.metric(t["win_rate"], "—")
+    # NO RESULTS
 
-    c3.metric(t["profit_factor"], "—")
+    # =====================================================
 
-    c4.metric(t["net_r"], "—")
+    if results is None:
 
-    c5.metric(t["max_dd"], "—")
+        st.info(
+
+            "Run a backtest first to view the results."
+
+        )
+
+    # =====================================================
+
+    # RESULTS
+
+    # =====================================================
+
+    else:
+
+        # -------------------------------------------------
+
+        # MAIN METRICS
+
+        # -------------------------------------------------
+
+        c1, c2, c3, c4, c5 = st.columns(5)
+
+        c1.metric(
+
+            t["trades"],
+
+            results["total_trades"]
+
+        )
+
+        c2.metric(
+
+            t["win_rate"],
+
+            f'{results["win_rate"]:.2f}%'
+
+        )
+
+        profit_factor = results["profit_factor"]
+
+        if profit_factor == float("inf"):
+
+            pf_display = "∞"
+
+        else:
+
+            pf_display = f"{profit_factor:.2f}"
+
+        c3.metric(
+
+            t["profit_factor"],
+
+            pf_display
+
+        )
+
+        c4.metric(
+
+            t["net_r"],
+
+            f'${results["net_profit"]:.2f}'
+
+        )
+
+        c5.metric(
+
+            t["max_dd"],
+
+            f'{results["max_drawdown"]:.2f}%'
+
+        )
+
+        # -------------------------------------------------
+
+        # BALANCE
+
+        # -------------------------------------------------
+
+        st.divider()
+
+        c1, c2, c3 = st.columns(3)
+
+        c1.metric(
+
+            "Initial Balance",
+
+            f'${results["initial_balance"]:,.2f}'
+
+        )
+
+        c2.metric(
+
+            "Final Balance",
+
+            f'${results["final_balance"]:,.2f}'
+
+        )
+
+        c3.metric(
+
+            "Net Profit",
+
+            f'${results["net_profit"]:,.2f}'
+
+        )
+
+        # -------------------------------------------------
+
+        # WIN / LOSS
+
+        # -------------------------------------------------
+
+        st.divider()
+
+        c1, c2 = st.columns(2)
+
+        c1.metric(
+
+            "Winning Trades",
+
+            results["winning_trades"]
+
+        )
+
+        c2.metric(
+
+            "Losing Trades",
+
+            results["losing_trades"]
+
+        )
+
+        # -------------------------------------------------
+
+        # EQUITY CURVE
+
+        # -------------------------------------------------
+
+        st.divider()
+
+        st.subheader("📈 Equity Curve")
+
+        equity_df = results["equity_curve"]
+
+        if (
+
+            equity_df is not None
+
+            and not equity_df.empty
+
+        ):
+
+            chart = equity_df[
+
+                ["datetime", "equity"]
+
+            ].copy()
+
+            chart = chart.set_index(
+
+                "datetime"
+
+            )
+
+            st.line_chart(
+
+                chart,
+
+                y="equity"
+
+            )
+
+        # -------------------------------------------------
+
+        # TRADES
+
+        # -------------------------------------------------
+
+        st.divider()
+
+        st.subheader("📋 Trades")
+
+        trades_df = results["trades"]
+
+        if (
+
+            trades_df is not None
+
+            and not trades_df.empty
+
+        ):
+
+            st.dataframe(
+
+                trades_df,
+
+                use_container_width=True
+
+            )
+
+        else:
+
+            st.info(
+
+                "No trades were generated."
+
+            )
