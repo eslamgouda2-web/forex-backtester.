@@ -2,7 +2,9 @@ import pandas as pd
 
 # =========================================================
 
-# DATA ENGINE V1
+# FOREX BACKTESTER
+
+# DATA ENGINE V2
 
 # =========================================================
 
@@ -20,53 +22,59 @@ REQUIRED_COLUMNS = [
 
 ]
 
+# =========================================================
+
+# NORMALIZE COLUMNS
+
+# =========================================================
+
 def normalize_columns(df):
 
     """
 
-    Convert common CSV column names into our standard names.
+    Convert common CSV column names into standard names.
 
     """
 
     column_map = {}
 
+    replacements = {
+
+        "date": "datetime",
+
+        "time": "datetime",
+
+        "timestamp": "datetime",
+
+        "datetime": "datetime",
+
+        "open": "open",
+
+        "o": "open",
+
+        "high": "high",
+
+        "h": "high",
+
+        "low": "low",
+
+        "l": "low",
+
+        "close": "close",
+
+        "c": "close",
+
+        "volume": "volume",
+
+        "vol": "volume",
+
+        "tick_volume": "volume"
+
+    }
+
     for column in df.columns:
 
         clean = str(column).strip().lower()
-
-        replacements = {
-
-            "date": "datetime",
-
-            "time": "datetime",
-
-            "timestamp": "datetime",
-
-            "datetime": "datetime",
-
-            "open": "open",
-
-            "o": "open",
-
-            "high": "high",
-
-            "h": "high",
-
-            "low": "low",
-
-            "l": "low",
-
-            "close": "close",
-
-            "c": "close",
-
-            "volume": "volume",
-
-            "vol": "volume",
-
-            "tick_volume": "volume"
-
-        }
 
         if clean in replacements:
 
@@ -75,6 +83,12 @@ def normalize_columns(df):
     df = df.rename(columns=column_map)
 
     return df
+
+# =========================================================
+
+# LOAD CSV
+
+# =========================================================
 
 def load_csv(file):
 
@@ -96,6 +110,12 @@ def load_csv(file):
 
         return None, f"CSV error: {str(e)}"
 
+# =========================================================
+
+# PREPARE DATA
+
+# =========================================================
+
 def prepare_data(df):
 
     """
@@ -104,9 +124,23 @@ def prepare_data(df):
 
     """
 
+    if df is None:
+
+        return None, {
+
+            "status": "error",
+
+            "message": "No data supplied."
+
+        }
+
     df = df.copy()
 
-    # Check required columns
+    # =====================================================
+
+    # CHECK REQUIRED COLUMNS
+
+    # =====================================================
 
     missing_columns = [
 
@@ -130,7 +164,11 @@ def prepare_data(df):
 
         }
 
-    # Convert datetime
+    # =====================================================
+
+    # CONVERT DATETIME
+
+    # =====================================================
 
     df["datetime"] = pd.to_datetime(
 
@@ -140,9 +178,13 @@ def prepare_data(df):
 
     )
 
-    # Convert price columns
+    # =====================================================
 
-    for column in [
+    # CONVERT PRICE COLUMNS
+
+    # =====================================================
+
+    price_columns = [
 
         "open",
 
@@ -152,7 +194,9 @@ def prepare_data(df):
 
         "close"
 
-    ]:
+    ]
+
+    for column in price_columns:
 
         df[column] = pd.to_numeric(
 
@@ -162,7 +206,11 @@ def prepare_data(df):
 
         )
 
-    # Volume is optional
+    # =====================================================
+
+    # OPTIONAL VOLUME
+
+    # =====================================================
 
     if "volume" in df.columns:
 
@@ -174,27 +222,51 @@ def prepare_data(df):
 
         )
 
-    # Remove invalid rows
+    # =====================================================
 
-    df = df.dropna(
+    # COUNT INVALID RAW VALUES
 
-        subset=[
+    # =====================================================
 
-            "datetime",
+    invalid_datetime = df["datetime"].isna()
 
-            "open",
+    invalid_price_values = (
 
-            "high",
+        df[price_columns]
 
-            "low",
+        .isna()
 
-            "close"
-
-        ]
+        .any(axis=1)
 
     )
 
-    # Sort chronologically
+    invalid_numeric_rows = (
+
+        invalid_datetime
+
+        | invalid_price_values
+
+    )
+
+    invalid_numeric_count = int(
+
+        invalid_numeric_rows.sum()
+
+    )
+
+    # Remove rows that cannot be used
+
+    df = df.loc[
+
+        ~invalid_numeric_rows
+
+    ].copy()
+
+    # =====================================================
+
+    # SORT CHRONOLOGICALLY
+
+    # =====================================================
 
     df = df.sort_values(
 
@@ -202,13 +274,21 @@ def prepare_data(df):
 
     )
 
-    # Remove duplicate candles
+    # =====================================================
 
-    duplicate_count = df.duplicated(
+    # REMOVE DUPLICATE CANDLES
 
-        subset=["datetime"]
+    # =====================================================
 
-    ).sum()
+    duplicate_count = int(
+
+        df.duplicated(
+
+            subset=["datetime"]
+
+        ).sum()
+
+    )
 
     df = df.drop_duplicates(
 
@@ -218,7 +298,11 @@ def prepare_data(df):
 
     )
 
-    # Reset index
+    # =====================================================
+
+    # RESET INDEX
+
+    # =====================================================
 
     df = df.reset_index(
 
@@ -226,19 +310,33 @@ def prepare_data(df):
 
     )
 
-    # Basic OHLC validation
+    # =====================================================
+
+    # OHLC VALIDATION
+
+    # =====================================================
 
     invalid_ohlc = (
 
-        (df["high"] < df["open"]) |
+        (df["high"] < df["open"])
 
-        (df["high"] < df["close"]) |
+        |
 
-        (df["high"] < df["low"]) |
+        (df["high"] < df["close"])
 
-        (df["low"] > df["open"]) |
+        |
 
-        (df["low"] > df["close"]) |
+        (df["high"] < df["low"])
+
+        |
+
+        (df["low"] > df["open"])
+
+        |
+
+        (df["low"] > df["close"])
+
+        |
 
         (df["low"] > df["high"])
 
@@ -250,7 +348,11 @@ def prepare_data(df):
 
     )
 
-    # Remove invalid OHLC candles
+    # =====================================================
+
+    # REMOVE INVALID OHLC
+
+    # =====================================================
 
     if invalid_ohlc_count > 0:
 
@@ -258,17 +360,37 @@ def prepare_data(df):
 
             ~invalid_ohlc
 
-        ].reset_index(drop=True)
+        ].reset_index(
 
-    # Calculate data information
+            drop=True
 
-    first_candle = df["datetime"].min()
+        )
 
-    last_candle = df["datetime"].max()
+    # =====================================================
+
+    # DATA INFORMATION
+
+    # =====================================================
+
+    if len(df) > 0:
+
+        first_candle = df["datetime"].min()
+
+        last_candle = df["datetime"].max()
+
+    else:
+
+        first_candle = None
+
+        last_candle = None
 
     candle_count = len(df)
 
-    # Estimate missing intervals
+    # =====================================================
+
+    # ESTIMATE MISSING INTERVALS
+
+    # =====================================================
 
     missing_bars = 0
 
@@ -286,25 +408,33 @@ def prepare_data(df):
 
         median_interval = differences.median()
 
-        if pd.notna(median_interval):
+        if pd.notna(median_interval) and median_interval > pd.Timedelta(0):
+
+            estimated_missing = (
+
+                differences
+
+                .div(median_interval)
+
+                .round()
+
+                .sub(1)
+
+                .clip(lower=0)
+
+            )
 
             missing_bars = int(
 
-                (
-
-                    differences
-
-                    .div(median_interval)
-
-                    .round()
-
-                    .sub(1)
-
-                    .clip(lower=0)
-
-                ).sum()
+                estimated_missing.sum()
 
             )
+
+    # =====================================================
+
+    # INFORMATION
+
+    # =====================================================
 
     information = {
 
@@ -334,11 +464,23 @@ def prepare_data(df):
 
         "duplicates_removed":
 
-            int(duplicate_count),
+            duplicate_count,
+
+        # Main key expected by app.py
+
+        "invalid_ohlc":
+
+            invalid_ohlc_count,
+
+        # Keep old key for compatibility
 
         "invalid_ohlc_removed":
 
             invalid_ohlc_count,
+
+        "invalid_numeric_rows":
+
+            invalid_numeric_count,
 
         "missing_bars":
 
@@ -347,6 +489,12 @@ def prepare_data(df):
     }
 
     return df, information
+
+# =========================================================
+
+# FINAL DATA VALIDATION
+
+# =========================================================
 
 def validate_data(df):
 
@@ -366,9 +514,51 @@ def validate_data(df):
 
         return False, "Dataset is empty."
 
-    required = [
+    # =====================================================
 
-        "datetime",
+    # REQUIRED COLUMNS
+
+    # =====================================================
+
+    for column in REQUIRED_COLUMNS:
+
+        if column not in df.columns:
+
+            return False, (
+
+                f"Missing column: {column}"
+
+            )
+
+    # =====================================================
+
+    # DATETIME VALIDATION
+
+    # =====================================================
+
+    if df["datetime"].isna().any():
+
+        return False, (
+
+            "Invalid datetime values detected."
+
+        )
+
+    if not df["datetime"].is_monotonic_increasing:
+
+        return False, (
+
+            "Datetime is not sorted."
+
+        )
+
+    # =====================================================
+
+    # PRICE VALIDATION
+
+    # =====================================================
+
+    price_columns = [
 
         "open",
 
@@ -380,21 +570,65 @@ def validate_data(df):
 
     ]
 
-    for column in required:
+    for column in price_columns:
 
-        if column not in df.columns:
+        if df[column].isna().any():
 
             return False, (
 
-                f"Missing column: {column}"
+                f"Invalid values in {column}."
 
             )
 
-    if not df["datetime"].is_monotonic_increasing:
+        if not pd.api.types.is_numeric_dtype(
+
+            df[column]
+
+        ):
+
+            return False, (
+
+                f"{column} must be numeric."
+
+            )
+
+    # =====================================================
+
+    # OHLC LOGIC VALIDATION
+
+    # =====================================================
+
+    invalid_ohlc = (
+
+        (df["high"] < df["open"])
+
+        |
+
+        (df["high"] < df["close"])
+
+        |
+
+        (df["high"] < df["low"])
+
+        |
+
+        (df["low"] > df["open"])
+
+        |
+
+        (df["low"] > df["close"])
+
+        |
+
+        (df["low"] > df["high"])
+
+    )
+
+    if invalid_ohlc.any():
 
         return False, (
 
-            "Datetime is not sorted."
+            "Invalid OHLC candles detected."
 
         )
 
