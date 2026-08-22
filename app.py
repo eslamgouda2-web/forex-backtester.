@@ -1318,9 +1318,11 @@ with tab3:
 
                     risk_percent=risk_percent,
 
-                    commission=commission,
+                    commission_per_lot_side=commission,
 
-                    slippage=slippage,
+                    spread_pips=0.0,
+
+                    slippage_pips=slippage,
 
                     allow_long=True,
 
