@@ -6,7 +6,7 @@ from data_engine import load_csv, prepare_data, validate_data
 
 from backtest_engine import BacktestEngine
 
-from strategy_engine import ExamplePriceActionStrategy, ZigZagSt
+from strategy_engine import ExamplePriceActionStrategy, ZigZagStrategy
 
 # =========================================================
 
