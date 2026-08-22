@@ -1338,7 +1338,13 @@ with tab3:
 
                 # -----------------------------------------
 
-                strategy = ExamplePriceActionStrategy()
+                if selected_strategy.startswith("〽️"):
+
+    strategy = ZigZagStrategy()
+
+else:
+
+    strategy = ExamplePriceActionStrategy()
 
                 # -----------------------------------------
 
