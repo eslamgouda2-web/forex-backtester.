@@ -899,3 +899,474 @@ class ExamplePriceActionStrategy(StrategyEngine):
                 )
 
         return self.create_signal()
+        # ============================================================
+
+# ZIGZAG + EMA 200 STRATEGY
+
+# ============================================================
+
+class ZigZagStrategy(StrategyEngine):
+
+    def __init__(
+
+        self,
+
+        name="ZigZag + EMA 200",
+
+        settings=None
+
+    ):
+
+        super().__init__(
+
+            name=name,
+
+            settings=settings
+
+        )
+
+        self.settings = settings or {}
+
+        self.pivot_left = int(
+
+            self.settings.get("pivot_left", 2)
+
+        )
+
+        self.pivot_right = int(
+
+            self.settings.get("pivot_right", 2)
+
+        )
+
+        self.risk_reward = float(
+
+            self.settings.get("risk_reward", 2.0)
+
+        )
+
+        self.ma_period = int(
+
+            self.settings.get("ma_period", 200)
+
+        )
+
+        self.last_broken_high = None
+
+        self.last_broken_low = None
+
+    # ========================================================
+
+    # PIVOT HIGH
+
+    # ========================================================
+
+    @staticmethod
+
+    def is_pivot_high(data, index, left=2, right=2):
+
+        if index < left:
+
+            return False
+
+        if index + right >= len(data):
+
+            return False
+
+        high = float(data.iloc[index]["high"])
+
+        for j in range(
+
+            index - left,
+
+            index + right + 1
+
+        ):
+
+            if j == index:
+
+                continue
+
+            if float(data.iloc[j]["high"]) >= high:
+
+                return False
+
+        return True
+
+    # ========================================================
+
+    # PIVOT LOW
+
+    # ========================================================
+
+    @staticmethod
+
+    def is_pivot_low(data, index, left=2, right=2):
+
+        if index < left:
+
+            return False
+
+        if index + right >= len(data):
+
+            return False
+
+        low = float(data.iloc[index]["low"])
+
+        for j in range(
+
+            index - left,
+
+            index + right + 1
+
+        ):
+
+            if j == index:
+
+                continue
+
+            if float(data.iloc[j]["low"]) <= low:
+
+                return False
+
+        return True
+
+    # ========================================================
+
+    # GET CONFIRMED ZIGZAG SWINGS
+
+    # ========================================================
+
+    def get_swings(self, data, current_index):
+
+        right = self.pivot_right
+
+        left = self.pivot_left
+
+        # The pivot at this position is only confirmed
+
+        # after "right" candles have closed.
+
+        confirmed_index = current_index - right
+
+        if confirmed_index <= left:
+
+            return [], []
+
+        highs = []
+
+        lows = []
+
+        start = max(
+
+            left,
+
+            confirmed_index - 500
+
+        )
+
+        end = confirmed_index + 1
+
+        for i in range(start, end):
+
+            if self.is_pivot_high(
+
+                data,
+
+                i,
+
+                left,
+
+                right
+
+            ):
+
+                highs.append({
+
+                    "index": i,
+
+                    "price": float(
+
+                        data.iloc[i]["high"]
+
+                    )
+
+                })
+
+            if self.is_pivot_low(
+
+                data,
+
+                i,
+
+                left,
+
+                right
+
+            ):
+
+                lows.append({
+
+                    "index": i,
+
+                    "price": float(
+
+                        data.iloc[i]["low"]
+
+                    )
+
+                })
+
+        return highs, lows
+
+    # ========================================================
+
+    # GENERATE SIGNAL
+
+    # ========================================================
+
+    def generate_signal(self, data, i):
+
+        # ----------------------------------------------------
+
+        # Not enough candles
+
+        # ----------------------------------------------------
+
+        minimum_bars = max(
+
+            self.ma_period,
+
+            50
+
+        )
+
+        if i < minimum_bars:
+
+            return self.create_signal()
+
+        row = data.iloc[i]
+
+        close = float(row["close"])
+
+        high = float(row["high"])
+
+        low = float(row["low"])
+
+        # ----------------------------------------------------
+
+        # EMA / MA 200
+
+        # ----------------------------------------------------
+
+        closes = data["close"].astype(float)
+
+        ma200 = (
+
+            closes
+
+            .iloc[:i + 1]
+
+            .rolling(self.ma_period)
+
+            .mean()
+
+            .iloc[-1]
+
+        )
+
+        if pd.isna(ma200):
+
+            return self.create_signal()
+
+        # ----------------------------------------------------
+
+        # Get confirmed ZigZag swings
+
+        # ----------------------------------------------------
+
+        swing_highs, swing_lows = self.get_swings(
+
+            data,
+
+            i
+
+        )
+
+        # ----------------------------------------------------
+
+        # Need at least 3 swing highs/lows
+
+        # ----------------------------------------------------
+
+        if len(swing_highs) < 3 and len(swing_lows) < 3:
+
+            return self.create_signal()
+
+        # ====================================================
+
+        # LONG SETUP
+
+        # ====================================================
+
+        if len(swing_highs) >= 3:
+
+            third_high = swing_highs[-3]
+
+            third_high_price = third_high["price"]
+
+            # Only consider a fresh break
+
+            if (
+
+                self.last_broken_high
+
+                != third_high["index"]
+
+            ):
+
+                # Trend filter
+
+                bullish_trend = close > ma200
+
+                # Break of the third confirmed swing high
+
+                bullish_break = close > third_high_price
+
+                if bullish_trend and bullish_break:
+
+                    # Latest confirmed swing low
+
+                    if len(swing_lows) > 0:
+
+                        latest_low = swing_lows[-1]
+
+                        stop_loss = latest_low["price"]
+
+                        risk = close - stop_loss
+
+                        if risk > 0:
+
+                            take_profit = (
+
+                                close
+
+                                + risk * self.risk_reward
+
+                            )
+
+                            self.last_broken_high = (
+
+                                third_high["index"]
+
+                            )
+
+                            return self.create_signal(
+
+                                side="LONG",
+
+                                entry=close,
+
+                                stop_loss=stop_loss,
+
+                                take_profit=take_profit,
+
+                                reason=(
+
+                                    "ZigZag 3rd High Break "
+
+                                    "+ MA 200"
+
+                                ),
+
+                                confidence=0.80
+
+                            )
+
+        # ====================================================
+
+        # SHORT SETUP
+
+        # ====================================================
+
+        if len(swing_lows) >= 3:
+
+            third_low = swing_lows[-3]
+
+            third_low_price = third_low["price"]
+
+            # Only consider a fresh break
+
+            if (
+
+                self.last_broken_low
+
+                != third_low["index"]
+
+            ):
+
+                # Trend filter
+
+                bearish_trend = close < ma200
+
+                # Break of the third confirmed swing low
+
+                bearish_break = close < third_low_price
+
+                if bearish_trend and bearish_break:
+
+                    # Latest confirmed swing high
+
+                    if len(swing_highs) > 0:
+
+                        latest_high = swing_highs[-1]
+
+                        stop_loss = latest_high["price"]
+
+                        risk = stop_loss - close
+
+                        if risk > 0:
+
+                            take_profit = (
+
+                                close
+
+                                - risk * self.risk_reward
+
+                            )
+
+                            self.last_broken_low = (
+
+                                third_low["index"]
+
+                            )
+
+                            return self.create_signal(
+
+                                side="SHORT",
+
+                                entry=close,
+
+                                stop_loss=stop_loss,
+
+                                take_profit=take_profit,
+
+                                reason=(
+
+                                    "ZigZag 3rd Low Break "
+
+                                    "+ MA 200"
+
+                                ),
+
+                                confidence=0.80
+
+                            )
+
+        # ----------------------------------------------------
+
+        # No signal
+
+        # ----------------------------------------------------
+
+        return self.create_signal()
