@@ -898,7 +898,81 @@ elif selected_strategy.startswith("〽️"):
 
     st.subheader("〽️ " + t["zigzag"])
 
-    st.info("ZigZag strategy builder")
+    st.markdown("### ZigZag Settings")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        zigzag_pivot_left = st.number_input(
+
+            "Pivot Left",
+
+            min_value=1,
+
+            max_value=20,
+
+            value=2,
+
+            step=1
+
+        )
+
+        zigzag_risk_reward = st.number_input(
+
+            "Risk / Reward",
+
+            min_value=0.5,
+
+            max_value=10.0,
+
+            value=2.0,
+
+            step=0.5
+
+        )
+
+    with col2:
+
+        zigzag_pivot_right = st.number_input(
+
+            "Pivot Right",
+
+            min_value=1,
+
+            max_value=20,
+
+            value=2,
+
+            step=1
+
+        )
+
+        zigzag_ma_period = st.number_input(
+
+            "EMA Period",
+
+            min_value=10,
+
+            max_value=500,
+
+            value=200,
+
+            step=10
+
+        )
+
+    zigzag_settings = {
+
+        "pivot_left": zigzag_pivot_left,
+
+        "pivot_right": zigzag_pivot_right,
+
+        "risk_reward": zigzag_risk_reward,
+
+        "ma_period": zigzag_ma_period,
+
+    }
 
 elif selected_strategy.startswith("🔄"):
 
@@ -1218,15 +1292,17 @@ with tab3:
 
     strategy_name = st.selectbox(
 
-        t["strategy"],
+    t["strategy"],
 
-        [
+    [
 
-            "Example Price Action Strategy"
+        "Example Price Action Strategy",
 
-        ]
+        "〽️ ZigZag + EMA 200"
 
-    )
+    ]
+
+)
 
     # =====================================================
 
