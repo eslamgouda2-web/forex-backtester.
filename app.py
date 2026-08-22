@@ -1498,27 +1498,27 @@ with tab3:
 
                 # -----------------------------------------
 
-            st.info(
+                st.info(
 
-    f"Trades: {results['total_trades']} | "
+                    f"Trades: {results['total_trades']} | "
 
-    f"Win Rate: {results['win_rate']:.2f}% | "
+                    f"Win Rate: {results['win_rate']:.2f}% | "
 
-    f"Profit Factor: "
+                    f"Profit Factor: "
 
-    f"{results['profit_factor']:.2f}"
+                    f"{results['profit_factor']:.2f}"
 
-    if results["profit_factor"] != float("inf")
+                    if results["profit_factor"] != float("inf")
 
-    else
+                    else
 
-    f"Trades: {results['total_trades']} | "
+                    f"Trades: {results['total_trades']} | "
 
-    f"Win Rate: {results['win_rate']:.2f}% | "
+                    f"Win Rate: {results['win_rate']:.2f}% | "
 
-    f"Profit Factor: ∞"
+                    f"Profit Factor: ∞"
 
-)
+                 )
             except Exception as e:
 
                 st.error(
