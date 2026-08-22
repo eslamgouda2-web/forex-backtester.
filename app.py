@@ -1340,11 +1340,11 @@ with tab3:
 
                 if selected_strategy.startswith("〽️"):
 
-    strategy = ZigZagStrategy()
+                     strategy = ZigZagStrategy()
 
-else:
+                 else:
 
-    strategy = ExamplePriceActionStrategy()
+                      strategy = ExamplePriceActionStrategy()
 
                 # -----------------------------------------
 
