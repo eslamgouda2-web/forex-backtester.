@@ -856,15 +856,61 @@ with tab2:
 
     st.subheader(t["strategy_builder"])
 
-    st.write("🧠 " + t["price_action"])
+    # Strategy selection
 
-    st.write("📊 " + t["indicators"])
+selected_strategy = st.radio(
 
-    st.write("〽️ " + t["zigzag"])
+    "Choose Strategy",
 
-    st.write("🔄 " + t["retest"])
+    [
 
-    st.write("📈 " + t["trailing"])
+        "🧠 " + t["price_action"],
+
+        "📊 " + t["indicators"],
+
+        "〽️ " + t["zigzag"],
+
+        "🔄 " + t["retest"],
+
+        "📈 " + t["trailing"],
+
+    ],
+
+    key="selected_strategy"
+
+)
+
+st.divider()
+
+if selected_strategy.startswith("🧠"):
+
+    st.subheader("🧠 " + t["price_action"])
+
+    st.info("Price Action strategy builder")
+
+elif selected_strategy.startswith("📊"):
+
+    st.subheader("📊 " + t["indicators"])
+
+    st.info("Indicators strategy builder")
+
+elif selected_strategy.startswith("〽️"):
+
+    st.subheader("〽️ " + t["zigzag"])
+
+    st.info("ZigZag strategy builder")
+
+elif selected_strategy.startswith("🔄"):
+
+    st.subheader("🔄 " + t["retest"])
+
+    st.info("Retest strategy builder")
+
+elif selected_strategy.startswith("📈"):
+
+    st.subheader("📈 " + t["trailing"])
+
+    st.info("Trailing Stop strategy builder")
 
 # =========================================================
 
