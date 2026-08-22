@@ -1342,7 +1342,7 @@ with tab3:
 
                      strategy = ZigZagStrategy()
 
-                 else:
+                else:
 
                       strategy = ExamplePriceActionStrategy()
 
