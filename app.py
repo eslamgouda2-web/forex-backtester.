@@ -1,8 +1,30 @@
 import streamlit as st
 
 from data_engine import load_csv, prepare_data, validate_data
-from strategy_engine import create_strategy, STRATEGY_REGISTRY
+
+import strategy_engine
+
 from backtest_engine import BacktestEngine
+
+STRATEGY_REGISTRY = getattr(strategy_engine, "STRATEGY_REGISTRY", {})
+
+def create_strategy(name, **params):
+
+    if hasattr(strategy_engine, "create_strategy"):
+
+        return strategy_engine.create_strategy(name, **params)
+
+    if name not in STRATEGY_REGISTRY:
+
+        available = ", ".join(STRATEGY_REGISTRY.keys())
+
+        raise ValueError(
+
+            f"Unknown strategy: {name}. Available strategies: {available}"
+
+        )
+
+    return STRATEGY_REGISTRY[name](**params)
 
 st.set_page_config(page_title="Forex Backtester", page_icon="📊", layout="wide")
 
