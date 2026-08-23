@@ -14,10 +14,21 @@ from backtest_engine import BacktestEngine
 
 # =========================================================
 
-STRATEGY_REGISTRY = getattr(strategy_engine, "STRATEGY_REGISTRY", {})
+import streamlit as st
 
-def create_strategy(name, **params):
+import pandas as pd
 
+from data_engine import load_csv, prepare_data, validate_data
+
+from strategy_engine import (
+
+    STRATEGY_REGISTRY,
+
+    create_strategy,
+
+)
+
+from backtest_engine import BacktestEngine
     """
 
     Compatible strategy factory.
