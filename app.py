@@ -14,21 +14,10 @@ from backtest_engine import BacktestEngine
 
 # =========================================================
 
-import streamlit as st
+STRATEGY_REGISTRY = getattr(strategy_engine, "STRATEGY_REGISTRY", {})
 
-import pandas as pd
+def create_strategy(name, **params):
 
-from data_engine import load_csv, prepare_data, validate_data
-
-from strategy_engine import (
-
-    STRATEGY_REGISTRY,
-
-    create_strategy,
-
-)
-
-from backtest_engine import BacktestEngine
     """
 
     Compatible strategy factory.
@@ -55,7 +44,9 @@ from backtest_engine import BacktestEngine
 
         )
 
-    return STRATEGY_REGISTRY[name](**params)
+    strategy_class = STRATEGY_REGISTRY[name]
+
+    return strategy_class(**params)
 
 # =========================================================
 
@@ -71,10 +62,9 @@ st.set_page_config(
 
     layout="wide",
 
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="expanded"
 
 )
-
 # =========================================================
 
 # CUSTOM CSS
