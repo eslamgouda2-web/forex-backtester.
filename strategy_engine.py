@@ -2,11 +2,13 @@ import pandas as pd
 
 import numpy as np
 
+from bisect import bisect_right
+
 # ============================================================
 
 # FOREX BACKTESTER
 
-# STRATEGY ENGINE V1
+# STRATEGY ENGINE - OPTIMIZED VERSION
 
 # ============================================================
 
@@ -16,17 +18,15 @@ class StrategyEngine:
 
     Universal strategy framework.
 
-    The strategy engine is responsible for:
+    Responsibilities:
 
-    - Reading market data
+    - Validate market data
 
-    - Calculating indicators
+    - Calculate indicators
 
-    - Reading price action
+    - Detect price action
 
-    - Generating LONG / SHORT / EXIT signals
-
-    - Keeping strategy logic separate from the backtest engine
+    - Generate trading signals
 
     """
 
@@ -96,7 +96,7 @@ class StrategyEngine:
 
     # ========================================================
 
-    # PRICE ACTION
+    # PRICE ACTION HELPERS
 
     # ========================================================
 
@@ -188,9 +188,9 @@ class StrategyEngine:
 
     def body_ratio(row):
 
-        candle_range = StrategyEngine.candle_range(row)
+        total_range = StrategyEngine.candle_range(row)
 
-        if candle_range <= 0:
+        if total_range <= 0:
 
             return 0.0
 
@@ -198,13 +198,13 @@ class StrategyEngine:
 
             StrategyEngine.candle_body(row)
 
-            / candle_range
+            / total_range
 
         )
 
     # ========================================================
 
-    # COMMON PRICE ACTION PATTERNS
+    # PRICE ACTION PATTERNS
 
     # ========================================================
 
@@ -226,9 +226,13 @@ class StrategyEngine:
 
             and StrategyEngine.is_bullish(current)
 
-            and current["open"] <= previous["close"]
+            and float(current["open"])
 
-            and current["close"] >= previous["open"]
+            <= float(previous["close"])
+
+            and float(current["close"])
+
+            >= float(previous["open"])
 
         )
 
@@ -250,9 +254,13 @@ class StrategyEngine:
 
             and StrategyEngine.is_bearish(current)
 
-            and current["open"] >= previous["close"]
+            and float(current["open"])
 
-            and current["close"] <= previous["open"]
+            >= float(previous["close"])
+
+            and float(current["close"])
+
+            <= float(previous["open"])
 
         )
 
@@ -268,7 +276,7 @@ class StrategyEngine:
 
     ):
 
-        if i < 0:
+        if i < 0 or i >= len(data):
 
             return False
 
@@ -286,9 +294,7 @@ class StrategyEngine:
 
             lower_wick >= body * wick_ratio
 
-            and float(row["close"])
-
-            > float(row["open"])
+            and StrategyEngine.is_bullish(row)
 
         )
 
@@ -304,7 +310,7 @@ class StrategyEngine:
 
     ):
 
-        if i < 0:
+        if i < 0 or i >= len(data):
 
             return False
 
@@ -322,15 +328,13 @@ class StrategyEngine:
 
             upper_wick >= body * wick_ratio
 
-            and float(row["close"])
-
-            < float(row["open"])
+            and StrategyEngine.is_bearish(row)
 
         )
 
     # ========================================================
 
-    # MOVING AVERAGE
+    # INDICATORS
 
     # ========================================================
 
@@ -338,9 +342,13 @@ class StrategyEngine:
 
     def sma(series, period):
 
+        period = int(period)
+
         return series.rolling(
 
-            window=int(period)
+            window=period,
+
+            min_periods=period
 
         ).mean()
 
@@ -348,23 +356,23 @@ class StrategyEngine:
 
     def ema(series, period):
 
+        period = int(period)
+
         return series.ewm(
 
-            span=int(period),
+            span=period,
 
-            adjust=False
+            adjust=False,
+
+            min_periods=period
 
         ).mean()
-
-    # ========================================================
-
-    # RSI
-
-    # ========================================================
 
     @staticmethod
 
     def rsi(series, period=14):
+
+        period = int(period)
 
         delta = series.diff()
 
@@ -376,7 +384,9 @@ class StrategyEngine:
 
             alpha=1 / period,
 
-            adjust=False
+            adjust=False,
+
+            min_periods=period
 
         ).mean()
 
@@ -384,7 +394,9 @@ class StrategyEngine:
 
             alpha=1 / period,
 
-            adjust=False
+            adjust=False,
+
+            min_periods=period
 
         ).mean()
 
@@ -402,17 +414,13 @@ class StrategyEngine:
 
         )
 
-        return result.fillna(50)
-
-    # ========================================================
-
-    # ATR
-
-    # ========================================================
+        return result.fillna(50.0)
 
     @staticmethod
 
     def atr(data, period=14):
+
+        period = int(period)
 
         previous_close = data["close"].shift(1)
 
@@ -446,13 +454,15 @@ class StrategyEngine:
 
         return true_range.rolling(
 
-            int(period)
+            period,
+
+            min_periods=period
 
         ).mean()
 
     # ========================================================
 
-    # INDICATOR REGISTRATION
+    # INDICATOR CALCULATION
 
     # ========================================================
 
@@ -460,13 +470,7 @@ class StrategyEngine:
 
         df = data.copy()
 
-        # --------------------------------------------
-
-        # Moving averages
-
-        # --------------------------------------------
-
-        for period in [
+        periods = [
 
             9,
 
@@ -478,7 +482,9 @@ class StrategyEngine:
 
             200
 
-        ]:
+        ]
+
+        for period in periods:
 
             df[f"sma_{period}"] = self.sma(
 
@@ -496,12 +502,6 @@ class StrategyEngine:
 
             )
 
-        # --------------------------------------------
-
-        # RSI
-
-        # --------------------------------------------
-
         df["rsi_14"] = self.rsi(
 
             df["close"],
@@ -509,12 +509,6 @@ class StrategyEngine:
             14
 
         )
-
-        # --------------------------------------------
-
-        # ATR
-
-        # --------------------------------------------
 
         df["atr_14"] = self.atr(
 
@@ -526,29 +520,21 @@ class StrategyEngine:
 
         self.indicators = {
 
-            "sma_9": df["sma_9"],
+            column: df[column]
 
-            "sma_20": df["sma_20"],
+            for column in df.columns
 
-            "sma_50": df["sma_50"],
+            if (
 
-            "sma_100": df["sma_100"],
+                column.startswith("sma_")
 
-            "sma_200": df["sma_200"],
+                or column.startswith("ema_")
 
-            "ema_9": df["ema_9"],
+                or column.startswith("rsi_")
 
-            "ema_20": df["ema_20"],
+                or column.startswith("atr_")
 
-            "ema_50": df["ema_50"],
-
-            "ema_100": df["ema_100"],
-
-            "ema_200": df["ema_200"],
-
-            "rsi_14": df["rsi_14"],
-
-            "atr_14": df["atr_14"]
+            )
 
         }
 
@@ -594,7 +580,7 @@ class StrategyEngine:
 
             "confidence": float(confidence),
 
-            "close_position": close_position
+            "close_position": bool(close_position)
 
         }
 
@@ -606,23 +592,11 @@ class StrategyEngine:
 
     def generate_signal(self, data, i):
 
-        """
-
-        Override this method when creating
-
-        a specific trading strategy.
-
-        """
-
-        if i < 1:
-
-            return self.create_signal()
-
         return self.create_signal()
 
     # ========================================================
 
-    # RUN STRATEGY
+    # PREPARE DATA
 
     # ========================================================
 
@@ -636,15 +610,53 @@ class StrategyEngine:
 
             "datetime"
 
-        ).reset_index(drop=True)
+        ).reset_index(
 
-        df = self.calculate_indicators(
-
-            df
+            drop=True
 
         )
 
+        numeric_columns = [
+
+            "open",
+
+            "high",
+
+            "low",
+
+            "close"
+
+        ]
+
+        for column in numeric_columns:
+
+            df[column] = pd.to_numeric(
+
+                df[column],
+
+                errors="coerce"
+
+            )
+
+        df = df.dropna(
+
+            subset=numeric_columns
+
+        ).reset_index(
+
+            drop=True
+
+        )
+
+        df = self.calculate_indicators(df)
+
         return df
+
+    # ========================================================
+
+    # RUN STRATEGY
+
+    # ========================================================
 
     def run(self, data):
 
@@ -668,11 +680,11 @@ class StrategyEngine:
 
             signal["index"] = i
 
-            signal["datetime"] = df.iloc[i][
+            signal["datetime"] = (
 
-                "datetime"
+                df.iloc[i]["datetime"]
 
-            ]
+            )
 
             self.signal_history.append(
 
@@ -680,15 +692,17 @@ class StrategyEngine:
 
             )
 
-        return df, pd.DataFrame(
+        return (
 
-            self.signal_history
+            df,
+
+            pd.DataFrame(self.signal_history)
 
         )
 
 # ============================================================
 
-# EXAMPLE STRATEGY
+# EXAMPLE PRICE ACTION STRATEGY
 
 # ============================================================
 
@@ -712,21 +726,23 @@ class ExamplePriceActionStrategy(StrategyEngine):
 
         )
 
-    def generate_signal(self, data, i):
+    def generate_signal(
 
-        if i < 20:
+        self,
+
+        data,
+
+        i
+
+    ):
+
+        if i < 200:
 
             return self.create_signal()
 
         row = data.iloc[i]
 
         close = float(row["close"])
-
-        # --------------------------------------------
-
-        # Bullish price action
-
-        # --------------------------------------------
 
         bullish = (
 
@@ -750,12 +766,6 @@ class ExamplePriceActionStrategy(StrategyEngine):
 
         )
 
-        # --------------------------------------------
-
-        # Bearish price action
-
-        # --------------------------------------------
-
         bearish = (
 
             self.bearish_engulfing(
@@ -778,41 +788,39 @@ class ExamplePriceActionStrategy(StrategyEngine):
 
         )
 
-        # --------------------------------------------
+        ema200 = row.get(
 
-        # Trend filter
+            "ema_200",
 
-        # --------------------------------------------
-
-        above_200 = (
-
-            close
-
-            > float(row["ema_200"])
+            np.nan
 
         )
 
-        below_200 = (
+        atr = row.get(
 
-            close
+            "atr_14",
 
-            < float(row["ema_200"])
+            np.nan
 
         )
 
-        atr = float(row["atr_14"])
+        if (
 
-        if not np.isfinite(atr):
+            pd.isna(ema200)
+
+            or pd.isna(atr)
+
+        ):
 
             return self.create_signal()
 
-        # --------------------------------------------
+        ema200 = float(ema200)
+
+        atr = float(atr)
 
         # LONG
 
-        # --------------------------------------------
-
-        if bullish and above_200:
+        if bullish and close > ema200:
 
             entry = close
 
@@ -824,7 +832,13 @@ class ExamplePriceActionStrategy(StrategyEngine):
 
             )
 
-            risk = entry - stop_loss
+            risk = (
+
+                entry
+
+                - stop_loss
+
+            )
 
             if risk > 0:
 
@@ -832,7 +846,7 @@ class ExamplePriceActionStrategy(StrategyEngine):
 
                     entry
 
-                    + risk * 2
+                    + risk * 2.0
 
                 )
 
@@ -846,19 +860,21 @@ class ExamplePriceActionStrategy(StrategyEngine):
 
                     take_profit=take_profit,
 
-                    reason="Bullish Price Action + EMA 200",
+                    reason=(
+
+                        "Bullish Price Action "
+
+                        "+ EMA 200"
+
+                    ),
 
                     confidence=0.75
 
                 )
 
-        # --------------------------------------------
-
         # SHORT
 
-        # --------------------------------------------
-
-        if bearish and below_200:
+        if bearish and close < ema200:
 
             entry = close
 
@@ -870,7 +886,13 @@ class ExamplePriceActionStrategy(StrategyEngine):
 
             )
 
-            risk = stop_loss - entry
+            risk = (
+
+                stop_loss
+
+                - entry
+
+            )
 
             if risk > 0:
 
@@ -878,7 +900,7 @@ class ExamplePriceActionStrategy(StrategyEngine):
 
                     entry
 
-                    - risk * 2
+                    - risk * 2.0
 
                 )
 
@@ -892,20 +914,69 @@ class ExamplePriceActionStrategy(StrategyEngine):
 
                     take_profit=take_profit,
 
-                    reason="Bearish Price Action + EMA 200",
+                    reason=(
+
+                        "Bearish Price Action "
+
+                        "+ EMA 200"
+
+                    ),
 
                     confidence=0.75
 
                 )
 
         return self.create_signal()
-        # ============================================================
 
-# ZIGZAG + EMA 200 STRATEGY
+# ============================================================
+
+# ZIGZAG + EMA STRATEGY
+
+# OPTIMIZED
 
 # ============================================================
 
 class ZigZagStrategy(StrategyEngine):
+
+    """
+
+    Optimized ZigZag strategy.
+
+    Entry logic:
+
+    LONG
+
+    ----
+
+    1. Price above EMA
+
+    2. At least 3 confirmed swing highs
+
+    3. Price breaks the third-most-recent confirmed high
+
+    4. Stop loss below latest confirmed swing low
+
+    SHORT
+
+    -----
+
+    1. Price below EMA
+
+    2. At least 3 confirmed swing lows
+
+    3. Price breaks the third-most-recent confirmed low
+
+    4. Stop loss above latest confirmed swing high
+
+    Important:
+
+    Pivot calculations are prepared ONCE.
+
+    The old version scanned up to 500 candles again
+
+    on every single candle.
+
+    """
 
     def __init__(
 
@@ -927,27 +998,75 @@ class ZigZagStrategy(StrategyEngine):
 
         self.settings = settings or {}
 
-        self.pivot_left = int(
+        self.pivot_left = max(
 
-            self.settings.get("pivot_left", 2)
+            1,
+
+            int(
+
+                self.settings.get(
+
+                    "pivot_left",
+
+                    2
+
+                )
+
+            )
 
         )
 
-        self.pivot_right = int(
+        self.pivot_right = max(
 
-            self.settings.get("pivot_right", 2)
+            1,
+
+            int(
+
+                self.settings.get(
+
+                    "pivot_right",
+
+                    2
+
+                )
+
+            )
 
         )
 
-        self.risk_reward = float(
+        self.risk_reward = max(
 
-            self.settings.get("risk_reward", 2.0)
+            0.1,
+
+            float(
+
+                self.settings.get(
+
+                    "risk_reward",
+
+                    2.0
+
+                )
+
+            )
 
         )
 
-        self.ma_period = int(
+        self.ma_period = max(
 
-            self.settings.get("ma_period", 200)
+            2,
+
+            int(
+
+                self.settings.get(
+
+                    "ma_period",
+
+                    200
+
+                )
+
+            )
 
         )
 
@@ -955,15 +1074,29 @@ class ZigZagStrategy(StrategyEngine):
 
         self.last_broken_low = None
 
+        self._pivot_high_indices = []
+
+        self._pivot_low_indices = []
+
     # ========================================================
 
-    # PIVOT HIGH
+    # PIVOT DETECTION
 
     # ========================================================
 
     @staticmethod
 
-    def is_pivot_high(data, index, left=2, right=2):
+    def is_pivot_high(
+
+        data,
+
+        index,
+
+        left=2,
+
+        right=2
+
+    ):
 
         if index < left:
 
@@ -973,149 +1106,403 @@ class ZigZagStrategy(StrategyEngine):
 
             return False
 
-        high = float(data.iloc[index]["high"])
+        high = float(
 
-        for j in range(
-
-            index - left,
-
-            index + right + 1
-
-        ):
-
-            if j == index:
-
-                continue
-
-            if float(data.iloc[j]["high"]) >= high:
-
-                return False
-
-        return True
-
-    # ========================================================
-
-    # PIVOT LOW
-
-    # ========================================================
-
-    @staticmethod
-
-    def is_pivot_low(data, index, left=2, right=2):
-
-        if index < left:
-
-            return False
-
-        if index + right >= len(data):
-
-            return False
-
-        low = float(data.iloc[index]["low"])
-
-        for j in range(
-
-            index - left,
-
-            index + right + 1
-
-        ):
-
-            if j == index:
-
-                continue
-
-            if float(data.iloc[j]["low"]) <= low:
-
-                return False
-
-        return True
-
-    # ========================================================
-
-    # GET CONFIRMED ZIGZAG SWINGS
-
-    # ========================================================
-
-    def get_swings(self, data, current_index):
-
-        right = self.pivot_right
-
-        left = self.pivot_left
-
-        # The pivot at this position is only confirmed
-
-        # after "right" candles have closed.
-
-        confirmed_index = current_index - right
-
-        if confirmed_index <= left:
-
-            return [], []
-
-        highs = []
-
-        lows = []
-
-        start = max(
-
-            left,
-
-            confirmed_index - 500
+            data.iloc[index]["high"]
 
         )
 
-        end = confirmed_index + 1
+        for j in range(
 
-        for i in range(start, end):
+            index - left,
 
-            if self.is_pivot_high(
+            index + right + 1
 
-                data,
+        ):
 
-                i,
+            if j == index:
 
-                left,
+                continue
 
-                right
+            if (
 
-            ):
+                float(data.iloc[j]["high"])
 
-                highs.append({
-
-                    "index": i,
-
-                    "price": float(
-
-                        data.iloc[i]["high"]
-
-                    )
-
-                })
-
-            if self.is_pivot_low(
-
-                data,
-
-                i,
-
-                left,
-
-                right
+                >= high
 
             ):
 
-                lows.append({
+                return False
 
-                    "index": i,
+        return True
 
-                    "price": float(
+    @staticmethod
 
-                        data.iloc[i]["low"]
+    def is_pivot_low(
 
-                    )
+        data,
 
-                })
+        index,
+
+        left=2,
+
+        right=2
+
+    ):
+
+        if index < left:
+
+            return False
+
+        if index + right >= len(data):
+
+            return False
+
+        low = float(
+
+            data.iloc[index]["low"]
+
+        )
+
+        for j in range(
+
+            index - left,
+
+            index + right + 1
+
+        ):
+
+            if j == index:
+
+                continue
+
+            if (
+
+                float(data.iloc[j]["low"])
+
+                <= low
+
+            ):
+
+                return False
+
+        return True
+
+    # ========================================================
+
+    # FAST PIVOT PRECALCULATION
+
+    # ========================================================
+
+    def _calculate_pivots(
+
+        self,
+
+        df
+
+    ):
+
+        n = len(df)
+
+        highs = (
+
+            df["high"]
+
+            .astype(float)
+
+            .to_numpy()
+
+        )
+
+        lows = (
+
+            df["low"]
+
+            .astype(float)
+
+            .to_numpy()
+
+        )
+
+        pivot_high = np.ones(
+
+            n,
+
+            dtype=bool
+
+        )
+
+        pivot_low = np.ones(
+
+            n,
+
+            dtype=bool
+
+        )
+
+        left = self.pivot_left
+
+        right = self.pivot_right
+
+        # Remove invalid edges
+
+        pivot_high[:left] = False
+
+        pivot_low[:left] = False
+
+        if right > 0:
+
+            pivot_high[n - right:] = False
+
+            pivot_low[n - right:] = False
+
+        # Strict pivot comparison.
+
+        # This preserves the old behavior where equal highs
+
+        # or equal lows do NOT count as pivots.
+
+        for offset in range(
+
+            1,
+
+            left + 1
+
+        ):
+
+            pivot_high[left:n-right] &= (
+
+                highs[left:n-right]
+
+                > highs[left-offset:n-right-offset]
+
+            )
+
+            pivot_low[left:n-right] &= (
+
+                lows[left:n-right]
+
+                < lows[left-offset:n-right-offset]
+
+            )
+
+        for offset in range(
+
+            1,
+
+            right + 1
+
+        ):
+
+            pivot_high[left:n-right] &= (
+
+                highs[left:n-right]
+
+                > highs[left+offset:n-right+offset]
+
+            )
+
+            pivot_low[left:n-right] &= (
+
+                lows[left:n-right]
+
+                < lows[left+offset:n-right+offset]
+
+            )
+
+        df["zigzag_pivot_high"] = pivot_high
+
+        df["zigzag_pivot_low"] = pivot_low
+
+        self._pivot_high_indices = (
+
+            np.flatnonzero(
+
+                pivot_high
+
+            ).astype(int).tolist()
+
+        )
+
+        self._pivot_low_indices = (
+
+            np.flatnonzero(
+
+                pivot_low
+
+            ).astype(int).tolist()
+
+        )
+
+        return df
+
+    # ========================================================
+
+    # PREPARE
+
+    # ========================================================
+
+    def prepare(
+
+        self,
+
+        data
+
+    ):
+
+        df = super().prepare(data)
+
+        # Custom EMA period if not already calculated
+
+        ema_column = (
+
+            f"ema_{self.ma_period}"
+
+        )
+
+        if ema_column not in df.columns:
+
+            df[ema_column] = self.ema(
+
+                df["close"],
+
+                self.ma_period
+
+            )
+
+        # Calculate all ZigZag pivots ONCE
+
+        df = self._calculate_pivots(
+
+            df
+
+        )
+
+        # Reset break memory for new backtest
+
+        self.last_broken_high = None
+
+        self.last_broken_low = None
+
+        return df
+
+    # ========================================================
+
+    # GET CONFIRMED SWINGS - FAST
+
+    # ========================================================
+
+    def _get_confirmed_indices(
+
+        self,
+
+        current_index,
+
+        indices
+
+    ):
+
+        # Pivot at index X becomes available only after
+
+        # pivot_right candles have closed.
+
+        confirmed_index = (
+
+            current_index
+
+            - self.pivot_right
+
+        )
+
+        if confirmed_index < 0:
+
+            return []
+
+        position = bisect_right(
+
+            indices,
+
+            confirmed_index
+
+        )
+
+        return indices[:position]
+
+    # ========================================================
+
+    # GET SWINGS
+
+    # ========================================================
+
+    def get_swings(
+
+        self,
+
+        data,
+
+        current_index
+
+    ):
+
+        confirmed_highs = (
+
+            self._get_confirmed_indices(
+
+                current_index,
+
+                self._pivot_high_indices
+
+            )
+
+        )
+
+        confirmed_lows = (
+
+            self._get_confirmed_indices(
+
+                current_index,
+
+                self._pivot_low_indices
+
+            )
+
+        )
+
+        highs = [
+
+            {
+
+                "index": index,
+
+                "price": float(
+
+                    data.iloc[index]["high"]
+
+                )
+
+            }
+
+            for index in confirmed_highs
+
+        ]
+
+        lows = [
+
+            {
+
+                "index": index,
+
+                "price": float(
+
+                    data.iloc[index]["low"]
+
+                )
+
+            }
+
+            for index in confirmed_lows
+
+        ]
 
         return highs, lows
 
@@ -1125,19 +1512,25 @@ class ZigZagStrategy(StrategyEngine):
 
     # ========================================================
 
-    def generate_signal(self, data, i):
+    def generate_signal(
 
-        # ----------------------------------------------------
+        self,
 
-        # Not enough candles
+        data,
 
-        # ----------------------------------------------------
+        i
+
+    ):
 
         minimum_bars = max(
 
             self.ma_period,
 
-            50
+            self.pivot_left
+
+            + self.pivot_right
+
+            + 10
 
         )
 
@@ -1147,61 +1540,59 @@ class ZigZagStrategy(StrategyEngine):
 
         row = data.iloc[i]
 
-        close = float(row["close"])
+        close = float(
 
-        high = float(row["high"])
-
-        low = float(row["low"])
-
-        # ----------------------------------------------------
-
-        # EMA / MA 200
-
-        # ----------------------------------------------------
-
-        closes = data["close"].astype(float)
-
-        ma200 = (
-
-            closes
-
-            .iloc[:i + 1]
-
-            .rolling(self.ma_period)
-
-            .mean()
-
-            .iloc[-1]
+            row["close"]
 
         )
 
-        if pd.isna(ma200):
+        ema_column = (
 
-            return self.create_signal()
-
-        # ----------------------------------------------------
-
-        # Get confirmed ZigZag swings
-
-        # ----------------------------------------------------
-
-        swing_highs, swing_lows = self.get_swings(
-
-            data,
-
-            i
+            f"ema_{self.ma_period}"
 
         )
 
-        # ----------------------------------------------------
+        ma_value = row.get(
 
-        # Need at least 3 swing highs/lows
+            ema_column,
 
-        # ----------------------------------------------------
+            np.nan
 
-        if len(swing_highs) < 3 and len(swing_lows) < 3:
+        )
+
+        if pd.isna(ma_value):
 
             return self.create_signal()
+
+        ma_value = float(ma_value)
+
+        # Get ONLY confirmed swings.
+
+        # No 500-candle rescanning here.
+
+        high_indices = (
+
+            self._get_confirmed_indices(
+
+                i,
+
+                self._pivot_high_indices
+
+            )
+
+        )
+
+        low_indices = (
+
+            self._get_confirmed_indices(
+
+                i,
+
+                self._pivot_low_indices
+
+            )
+
+        )
 
         # ====================================================
 
@@ -1209,41 +1600,79 @@ class ZigZagStrategy(StrategyEngine):
 
         # ====================================================
 
-        if len(swing_highs) >= 3:
+        if len(high_indices) >= 3:
 
-            third_high = swing_highs[-3]
+            third_high_index = (
 
-            third_high_price = third_high["price"]
+                high_indices[-3]
 
-            # Only consider a fresh break
+            )
+
+            third_high_price = float(
+
+                data.iloc[
+
+                    third_high_index
+
+                ]["high"]
+
+            )
+
+            bullish_trend = (
+
+                close > ma_value
+
+            )
+
+            bullish_break = (
+
+                close > third_high_price
+
+            )
 
             if (
 
-                self.last_broken_high
+                bullish_trend
 
-                != third_high["index"]
+                and bullish_break
 
             ):
 
-                # Trend filter
+                # Prevent duplicate signal for same level
 
-                bullish_trend = close > ma200
+                if (
 
-                # Break of the third confirmed swing high
+                    self.last_broken_high
 
-                bullish_break = close > third_high_price
+                    != third_high_index
 
-                if bullish_trend and bullish_break:
+                ):
 
-                    # Latest confirmed swing low
+                    if len(low_indices) > 0:
 
-                    if len(swing_lows) > 0:
+                        latest_low_index = (
 
-                        latest_low = swing_lows[-1]
+                            low_indices[-1]
 
-                        stop_loss = latest_low["price"]
+                        )
 
-                        risk = close - stop_loss
+                        stop_loss = float(
+
+                            data.iloc[
+
+                                latest_low_index
+
+                            ]["low"]
+
+                        )
+
+                        risk = (
+
+                            close
+
+                            - stop_loss
+
+                        )
 
                         if risk > 0:
 
@@ -1251,13 +1680,15 @@ class ZigZagStrategy(StrategyEngine):
 
                                 close
 
-                                + risk * self.risk_reward
+                                + risk
+
+                                * self.risk_reward
 
                             )
 
                             self.last_broken_high = (
 
-                                third_high["index"]
+                                third_high_index
 
                             )
 
@@ -1275,7 +1706,7 @@ class ZigZagStrategy(StrategyEngine):
 
                                     "ZigZag 3rd High Break "
 
-                                    "+ MA 200"
+                                    f"+ EMA {self.ma_period}"
 
                                 ),
 
@@ -1289,41 +1720,79 @@ class ZigZagStrategy(StrategyEngine):
 
         # ====================================================
 
-        if len(swing_lows) >= 3:
+        if len(low_indices) >= 3:
 
-            third_low = swing_lows[-3]
+            third_low_index = (
 
-            third_low_price = third_low["price"]
+                low_indices[-3]
 
-            # Only consider a fresh break
+            )
+
+            third_low_price = float(
+
+                data.iloc[
+
+                    third_low_index
+
+                ]["low"]
+
+            )
+
+            bearish_trend = (
+
+                close < ma_value
+
+            )
+
+            bearish_break = (
+
+                close < third_low_price
+
+            )
 
             if (
 
-                self.last_broken_low
+                bearish_trend
 
-                != third_low["index"]
+                and bearish_break
 
             ):
 
-                # Trend filter
+                # Prevent duplicate signal for same level
 
-                bearish_trend = close < ma200
+                if (
 
-                # Break of the third confirmed swing low
+                    self.last_broken_low
 
-                bearish_break = close < third_low_price
+                    != third_low_index
 
-                if bearish_trend and bearish_break:
+                ):
 
-                    # Latest confirmed swing high
+                    if len(high_indices) > 0:
 
-                    if len(swing_highs) > 0:
+                        latest_high_index = (
 
-                        latest_high = swing_highs[-1]
+                            high_indices[-1]
 
-                        stop_loss = latest_high["price"]
+                        )
 
-                        risk = stop_loss - close
+                        stop_loss = float(
+
+                            data.iloc[
+
+                                latest_high_index
+
+                            ]["high"]
+
+                        )
+
+                        risk = (
+
+                            stop_loss
+
+                            - close
+
+                        )
 
                         if risk > 0:
 
@@ -1331,13 +1800,15 @@ class ZigZagStrategy(StrategyEngine):
 
                                 close
 
-                                - risk * self.risk_reward
+                                - risk
+
+                                * self.risk_reward
 
                             )
 
                             self.last_broken_low = (
 
-                                third_low["index"]
+                                third_low_index
 
                             )
 
@@ -1355,18 +1826,12 @@ class ZigZagStrategy(StrategyEngine):
 
                                     "ZigZag 3rd Low Break "
 
-                                    "+ MA 200"
+                                    f"+ EMA {self.ma_period}"
 
                                 ),
 
                                 confidence=0.80
 
                             )
-
-        # ----------------------------------------------------
-
-        # No signal
-
-        # ----------------------------------------------------
 
         return self.create_signal()
