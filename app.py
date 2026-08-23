@@ -4,9 +4,9 @@ import pandas as pd
 
 from data_engine import load_csv, prepare_data, validate_data
 
-import strategy_engine
-
 from backtest_engine import BacktestEngine
+
+import strategy_engine
 
 # =========================================================
 
@@ -14,39 +14,11 @@ from backtest_engine import BacktestEngine
 
 # =========================================================
 
-STRATEGY_REGISTRY = getattr(strategy_engine, "STRATEGY_REGISTRY", {})
+STRATEGY_REGISTRY = strategy_engine.STRATEGY_REGISTRY
 
 def create_strategy(name, **params):
 
-    """
-
-    Compatible strategy factory.
-
-    Uses create_strategy() if available in strategy_engine.
-
-    Falls back to STRATEGY_REGISTRY for compatibility.
-
-    """
-
-    if hasattr(strategy_engine, "create_strategy"):
-
-        return strategy_engine.create_strategy(name, **params)
-
-    if name not in STRATEGY_REGISTRY:
-
-        available = ", ".join(STRATEGY_REGISTRY.keys())
-
-        raise ValueError(
-
-            f"Unknown strategy: {name}. "
-
-            f"Available strategies: {available}"
-
-        )
-
-    strategy_class = STRATEGY_REGISTRY[name]
-
-    return strategy_class(**params)
+    return strategy_engine.create_strategy(name, **params)
 
 # =========================================================
 
