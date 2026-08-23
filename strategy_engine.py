@@ -2,63 +2,777 @@ import pandas as pd
 
 import numpy as np
 
-from bisect import bisect_right
+class BacktestEngine:
 
-# ============================================================
+    def __init__(
 
-# FOREX BACKTESTER
+        self,
 
-# STRATEGY ENGINE - OPTIMIZED VERSION
+        initial_balance=10000.0,
 
-# ============================================================
+        risk_percent=1.0,
 
-class StrategyEngine:
+        commission_per_lot_side=0.0,
 
-    """
+        spread_pips=0.0,
 
-    Universal strategy framework.
+        slippage_pips=0.0,
 
-    Responsibilities:
+        pip_size=0.0001,
 
-    - Validate market data
+        lot_size=100000.0,
 
-    - Calculate indicators
+        pip_value_per_lot=None,
 
-    - Detect price action
+        risk_based_on="balance",
 
-    - Generate trading signals
+        allow_long=True,
 
-    """
+        allow_short=True,
 
-    def __init__(self, name="Custom Strategy", settings=None):
+        one_position_only=True,
 
-        self.name = name
+    ):
 
-        self.settings = settings or {}
+        self.initial_balance = float(initial_balance)
 
-        self.indicators = {}
+        self.balance = float(initial_balance)
 
-        self.state = {}
+        self.risk_percent = float(risk_percent)
 
-        self.signal_history = []
+        self.commission_per_lot_side = float(
+
+            commission_per_lot_side
+
+        )
+
+        self.spread_pips = float(spread_pips)
+
+        self.slippage_pips = float(slippage_pips)
+
+        self.pip_size = float(pip_size)
+
+        self.lot_size = float(lot_size)
+
+        self.pip_value_per_lot = pip_value_per_lot
+
+        self.risk_based_on = risk_based_on
+
+        self.allow_long = allow_long
+
+        self.allow_short = allow_short
+
+        self.one_position_only = one_position_only
+
+        self.position = None
+
+        self.pending_order = None
+
+        self.pending_close = None
+
+        self.trades = []
+
+        self.equity_curve = []
 
     # ========================================================
 
-    # DATA VALIDATION
+    # PRICE HELPERS
+
+    # ========================================================
+
+    def _spread_price(self):
+
+        return (
+
+            self.spread_pips
+
+            * self.pip_size
+
+        )
+
+    def _slippage_price(self):
+
+        return (
+
+            self.slippage_pips
+
+            * self.pip_size
+
+        )
+
+    def _bid(self, price):
+
+        return (
+
+            float(price)
+
+            - self._spread_price() / 2
+
+        )
+
+    def _ask(self, price):
+
+        return (
+
+            float(price)
+
+            + self._spread_price() / 2
+
+        )
+
+    # ========================================================
+
+    # POSITION SIZE
+
+    # ========================================================
+
+    def calculate_position_size(
+
+        self,
+
+        entry,
+
+        stop_loss
+
+    ):
+
+        if stop_loss is None:
+
+            return 0.0
+
+        entry = float(entry)
+
+        stop_loss = float(stop_loss)
+
+        distance = abs(
+
+            entry - stop_loss
+
+        )
+
+        if distance <= 0:
+
+            return 0.0
+
+        risk_money = (
+
+            self.balance
+
+            * self.risk_percent
+
+            / 100
+
+        )
+
+        size = (
+
+            risk_money
+
+            / distance
+
+        )
+
+        return float(size)
+
+    # ========================================================
+
+    # OPEN POSITION
+
+    # ========================================================
+
+    def open_position(
+
+        self,
+
+        side,
+
+        entry,
+
+        stop_loss,
+
+        take_profit,
+
+        timestamp
+
+    ):
+
+        if self.position is not None:
+
+            return False
+
+        if side == "LONG":
+
+            if not self.allow_long:
+
+                return False
+
+            actual_entry = (
+
+                self._ask(entry)
+
+                + self._slippage_price()
+
+            )
+
+            if (
+
+                stop_loss is None
+
+                or stop_loss >= actual_entry
+
+            ):
+
+                return False
+
+        elif side == "SHORT":
+
+            if not self.allow_short:
+
+                return False
+
+            actual_entry = (
+
+                self._bid(entry)
+
+                - self._slippage_price()
+
+            )
+
+            if (
+
+                stop_loss is None
+
+                or stop_loss <= actual_entry
+
+            ):
+
+                return False
+
+        else:
+
+            return False
+
+        size = self.calculate_position_size(
+
+            actual_entry,
+
+            stop_loss
+
+        )
+
+        if size <= 0:
+
+            return False
+
+        self.position = {
+
+            "side": side,
+
+            "entry": actual_entry,
+
+            "stop_loss": float(stop_loss),
+
+            "take_profit": (
+
+                float(take_profit)
+
+                if take_profit is not None
+
+                else None
+
+            ),
+
+            "initial_stop_loss": float(stop_loss),
+
+            "size": size,
+
+            "entry_time": timestamp,
+
+            "highest_price": actual_entry,
+
+            "lowest_price": actual_entry
+
+        }
+
+        return True
+
+    # ========================================================
+
+    # CLOSE POSITION
+
+    # ========================================================
+
+    def close_position(
+
+        self,
+
+        market_price,
+
+        timestamp,
+
+        reason
+
+    ):
+
+        if self.position is None:
+
+            return None
+
+        position = self.position
+
+        side = position["side"]
+
+        entry = position["entry"]
+
+        size = position["size"]
+
+        if side == "LONG":
+
+            exit_price = (
+
+                self._bid(market_price)
+
+                - self._slippage_price()
+
+            )
+
+            pnl = (
+
+                exit_price - entry
+
+            ) * size
+
+        else:
+
+            exit_price = (
+
+                self._ask(market_price)
+
+                + self._slippage_price()
+
+            )
+
+            pnl = (
+
+                entry - exit_price
+
+            ) * size
+
+        lots = (
+
+            size
+
+            / self.lot_size
+
+        )
+
+        commission = (
+
+            lots
+
+            * self.commission_per_lot_side
+
+            * 2
+
+        )
+
+        net_pnl = (
+
+            pnl - commission
+
+        )
+
+        self.balance += net_pnl
+
+        risk_distance = abs(
+
+            entry
+
+            - position["initial_stop_loss"]
+
+        )
+
+        if risk_distance > 0:
+
+            if side == "LONG":
+
+                r_multiple = (
+
+                    exit_price - entry
+
+                ) / risk_distance
+
+            else:
+
+                r_multiple = (
+
+                    entry - exit_price
+
+                ) / risk_distance
+
+        else:
+
+            r_multiple = 0.0
+
+        trade = {
+
+            "side": side,
+
+            "entry_time": (
+
+                position["entry_time"]
+
+            ),
+
+            "exit_time": timestamp,
+
+            "entry": entry,
+
+            "exit": exit_price,
+
+            "stop_loss": (
+
+                position["stop_loss"]
+
+            ),
+
+            "initial_stop_loss": (
+
+                position["initial_stop_loss"]
+
+            ),
+
+            "take_profit": (
+
+                position["take_profit"]
+
+            ),
+
+            "size_units": size,
+
+            "lots": lots,
+
+            "gross_pnl": pnl,
+
+            "commission": commission,
+
+            "net_pnl": net_pnl,
+
+            "r_multiple": r_multiple,
+
+            "reason": reason,
+
+            "balance": self.balance
+
+        }
+
+        self.trades.append(trade)
+
+        self.position = None
+
+        return trade
+
+    # ========================================================
+
+    # CHECK EXIT
+
+    # ========================================================
+
+    def check_exit(
+
+        self,
+
+        high,
+
+        low,
+
+        timestamp
+
+    ):
+
+        if self.position is None:
+
+            return
+
+        position = self.position
+
+        side = position["side"]
+
+        stop = position["stop_loss"]
+
+        target = position["take_profit"]
+
+        high = float(high)
+
+        low = float(low)
+
+        # LONG
+
+        if side == "LONG":
+
+            if (
+
+                stop is not None
+
+                and self._bid(low) <= stop
+
+            ):
+
+                self.close_position(
+
+                    stop,
+
+                    timestamp,
+
+                    "Stop Loss"
+
+                )
+
+                return
+
+            if (
+
+                target is not None
+
+                and self._bid(high) >= target
+
+            ):
+
+                self.close_position(
+
+                    target,
+
+                    timestamp,
+
+                    "Take Profit"
+
+                )
+
+                return
+
+        # SHORT
+
+        elif side == "SHORT":
+
+            if (
+
+                stop is not None
+
+                and self._ask(high) >= stop
+
+            ):
+
+                self.close_position(
+
+                    stop,
+
+                    timestamp,
+
+                    "Stop Loss"
+
+                )
+
+                return
+
+            if (
+
+                target is not None
+
+                and self._ask(low) <= target
+
+            ):
+
+                self.close_position(
+
+                    target,
+
+                    timestamp,
+
+                    "Take Profit"
+
+                )
+
+                return
+
+    # ========================================================
+
+    # EQUITY
+
+    # ========================================================
+
+    def calculate_equity(
+
+        self,
+
+        close
+
+    ):
+
+        equity = self.balance
+
+        if self.position is None:
+
+            return equity
+
+        position = self.position
+
+        if position["side"] == "LONG":
+
+            current_price = self._bid(close)
+
+            unrealized = (
+
+                current_price
+
+                - position["entry"]
+
+            ) * position["size"]
+
+        else:
+
+            current_price = self._ask(close)
+
+            unrealized = (
+
+                position["entry"]
+
+                - current_price
+
+            ) * position["size"]
+
+        return (
+
+            equity + unrealized
+
+        )
+
+    # ========================================================
+
+    # STRATEGY SIGNAL
 
     # ========================================================
 
     @staticmethod
 
-    def validate_market_data(data):
+    def get_signal(
+
+        strategy,
+
+        df,
+
+        index
+
+    ):
+
+        try:
+
+            signal = strategy.generate_signal(
+
+                df,
+
+                index
+
+            )
+
+            if isinstance(
+
+                signal,
+
+                dict
+
+            ):
+
+                return signal
+
+        except Exception:
+
+            return {}
+
+        return {}
+
+    # ========================================================
+
+    # MAX DRAWDOWN
+
+    # ========================================================
+
+    @staticmethod
+
+    def calculate_max_drawdown(
+
+        equity_df
+
+    ):
+
+        if equity_df is None:
+
+            return 0.0
+
+        if equity_df.empty:
+
+            return 0.0
+
+        equity = (
+
+            equity_df["equity"]
+
+            .astype(float)
+
+        )
+
+        peak = equity.cummax()
+
+        drawdown = (
+
+            (equity - peak)
+
+            / peak
+
+        ) * 100
+
+        return abs(
+
+            float(
+
+                drawdown.min()
+
+            )
+
+        )
+
+    # ========================================================
+
+    # RUN BACKTEST
+
+    # ========================================================
+
+    def run(
+
+        self,
+
+        data,
+
+        strategy,
+
+        trailing_distance=None
+
+    ):
 
         if data is None:
 
-            raise ValueError("No market data supplied.")
+            raise ValueError(
 
-        if data.empty:
+                "No market data supplied."
 
-            raise ValueError("Market data is empty.")
+            )
+
+        if len(data) == 0:
+
+            raise ValueError(
+
+                "Market data is empty."
+
+            )
 
         required = [
 
@@ -76,11 +790,11 @@ class StrategyEngine:
 
         missing = [
 
-            column
+            col
 
-            for column in required
+            for col in required
 
-            if column not in data.columns
+            if col not in data.columns
 
         ]
 
@@ -88,1121 +802,59 @@ class StrategyEngine:
 
             raise ValueError(
 
-                f"Missing required columns: {missing}"
+                f"Missing columns: {missing}"
 
             )
 
-        return True
+        # ====================================================
 
-    # ========================================================
+        # RESET
 
-    # PRICE ACTION HELPERS
+        # ====================================================
 
-    # ========================================================
+        self.balance = self.initial_balance
 
-    @staticmethod
+        self.position = None
 
-    def candle_body(row):
+        self.pending_order = None
 
-        return abs(
+        self.pending_close = None
 
-            float(row["close"])
+        self.trades = []
 
-            - float(row["open"])
+        self.equity_curve = []
 
-        )
+        # ====================================================
 
-    @staticmethod
+        # FAST DATA ARRAYS
 
-    def candle_range(row):
+        # ====================================================
 
-        return (
+        df = (
 
-            float(row["high"])
+            data
 
-            - float(row["low"])
+            .sort_values("datetime")
 
-        )
-
-    @staticmethod
-
-    def is_bullish(row):
-
-        return (
-
-            float(row["close"])
-
-            > float(row["open"])
+            .reset_index(drop=True)
 
         )
 
-    @staticmethod
+        timestamps = (
 
-    def is_bearish(row):
-
-        return (
-
-            float(row["close"])
-
-            < float(row["open"])
+            df["datetime"].to_numpy()
 
         )
 
-    @staticmethod
+        opens = (
 
-    def upper_wick(row):
+            df["open"]
 
-        return (
+            .astype(float)
 
-            float(row["high"])
-
-            - max(
-
-                float(row["open"]),
-
-                float(row["close"])
-
-            )
+            .to_numpy()
 
         )
-
-    @staticmethod
-
-    def lower_wick(row):
-
-        return (
-
-            min(
-
-                float(row["open"]),
-
-                float(row["close"])
-
-            )
-
-            - float(row["low"])
-
-        )
-
-    @staticmethod
-
-    def body_ratio(row):
-
-        total_range = StrategyEngine.candle_range(row)
-
-        if total_range <= 0:
-
-            return 0.0
-
-        return (
-
-            StrategyEngine.candle_body(row)
-
-            / total_range
-
-        )
-
-    # ========================================================
-
-    # PRICE ACTION PATTERNS
-
-    # ========================================================
-
-    @staticmethod
-
-    def bullish_engulfing(data, i):
-
-        if i < 1:
-
-            return False
-
-        previous = data.iloc[i - 1]
-
-        current = data.iloc[i]
-
-        return (
-
-            StrategyEngine.is_bearish(previous)
-
-            and StrategyEngine.is_bullish(current)
-
-            and float(current["open"])
-
-            <= float(previous["close"])
-
-            and float(current["close"])
-
-            >= float(previous["open"])
-
-        )
-
-    @staticmethod
-
-    def bearish_engulfing(data, i):
-
-        if i < 1:
-
-            return False
-
-        previous = data.iloc[i - 1]
-
-        current = data.iloc[i]
-
-        return (
-
-            StrategyEngine.is_bullish(previous)
-
-            and StrategyEngine.is_bearish(current)
-
-            and float(current["open"])
-
-            >= float(previous["close"])
-
-            and float(current["close"])
-
-            <= float(previous["open"])
-
-        )
-
-    @staticmethod
-
-    def bullish_pin_bar(
-
-        data,
-
-        i,
-
-        wick_ratio=2.0
-
-    ):
-
-        if i < 0 or i >= len(data):
-
-            return False
-
-        row = data.iloc[i]
-
-        body = StrategyEngine.candle_body(row)
-
-        lower_wick = StrategyEngine.lower_wick(row)
-
-        if body <= 0:
-
-            return False
-
-        return (
-
-            lower_wick >= body * wick_ratio
-
-            and StrategyEngine.is_bullish(row)
-
-        )
-
-    @staticmethod
-
-    def bearish_pin_bar(
-
-        data,
-
-        i,
-
-        wick_ratio=2.0
-
-    ):
-
-        if i < 0 or i >= len(data):
-
-            return False
-
-        row = data.iloc[i]
-
-        body = StrategyEngine.candle_body(row)
-
-        upper_wick = StrategyEngine.upper_wick(row)
-
-        if body <= 0:
-
-            return False
-
-        return (
-
-            upper_wick >= body * wick_ratio
-
-            and StrategyEngine.is_bearish(row)
-
-        )
-
-    # ========================================================
-
-    # INDICATORS
-
-    # ========================================================
-
-    @staticmethod
-
-    def sma(series, period):
-
-        period = int(period)
-
-        return series.rolling(
-
-            window=period,
-
-            min_periods=period
-
-        ).mean()
-
-    @staticmethod
-
-    def ema(series, period):
-
-        period = int(period)
-
-        return series.ewm(
-
-            span=period,
-
-            adjust=False,
-
-            min_periods=period
-
-        ).mean()
-
-    @staticmethod
-
-    def rsi(series, period=14):
-
-        period = int(period)
-
-        delta = series.diff()
-
-        gains = delta.clip(lower=0)
-
-        losses = -delta.clip(upper=0)
-
-        average_gain = gains.ewm(
-
-            alpha=1 / period,
-
-            adjust=False,
-
-            min_periods=period
-
-        ).mean()
-
-        average_loss = losses.ewm(
-
-            alpha=1 / period,
-
-            adjust=False,
-
-            min_periods=period
-
-        ).mean()
-
-        rs = (
-
-            average_gain
-
-            / average_loss.replace(0, np.nan)
-
-        )
-
-        result = 100 - (
-
-            100 / (1 + rs)
-
-        )
-
-        return result.fillna(50.0)
-
-    @staticmethod
-
-    def atr(data, period=14):
-
-        period = int(period)
-
-        previous_close = data["close"].shift(1)
-
-        true_range = pd.concat(
-
-            [
-
-                data["high"] - data["low"],
-
-                (
-
-                    data["high"]
-
-                    - previous_close
-
-                ).abs(),
-
-                (
-
-                    data["low"]
-
-                    - previous_close
-
-                ).abs()
-
-            ],
-
-            axis=1
-
-        ).max(axis=1)
-
-        return true_range.rolling(
-
-            period,
-
-            min_periods=period
-
-        ).mean()
-
-    # ========================================================
-
-    # INDICATOR CALCULATION
-
-    # ========================================================
-
-    def calculate_indicators(self, data):
-
-        df = data.copy()
-
-        periods = [
-
-            9,
-
-            20,
-
-            50,
-
-            100,
-
-            200
-
-        ]
-
-        for period in periods:
-
-            df[f"sma_{period}"] = self.sma(
-
-                df["close"],
-
-                period
-
-            )
-
-            df[f"ema_{period}"] = self.ema(
-
-                df["close"],
-
-                period
-
-            )
-
-        df["rsi_14"] = self.rsi(
-
-            df["close"],
-
-            14
-
-        )
-
-        df["atr_14"] = self.atr(
-
-            df,
-
-            14
-
-        )
-
-        self.indicators = {
-
-            column: df[column]
-
-            for column in df.columns
-
-            if (
-
-                column.startswith("sma_")
-
-                or column.startswith("ema_")
-
-                or column.startswith("rsi_")
-
-                or column.startswith("atr_")
-
-            )
-
-        }
-
-        return df
-
-    # ========================================================
-
-    # SIGNAL CREATOR
-
-    # ========================================================
-
-    @staticmethod
-
-    def create_signal(
-
-        side=None,
-
-        entry=None,
-
-        stop_loss=None,
-
-        take_profit=None,
-
-        reason="",
-
-        confidence=0.0,
-
-        close_position=False
-
-    ):
-
-        return {
-
-            "side": side,
-
-            "entry": entry,
-
-            "stop_loss": stop_loss,
-
-            "take_profit": take_profit,
-
-            "reason": reason,
-
-            "confidence": float(confidence),
-
-            "close_position": bool(close_position)
-
-        }
-
-    # ========================================================
-
-    # GENERIC STRATEGY
-
-    # ========================================================
-
-    def generate_signal(self, data, i):
-
-        return self.create_signal()
-
-    # ========================================================
-
-    # PREPARE DATA
-
-    # ========================================================
-
-    def prepare(self, data):
-
-        self.validate_market_data(data)
-
-        df = data.copy()
-
-        df = df.sort_values(
-
-            "datetime"
-
-        ).reset_index(
-
-            drop=True
-
-        )
-
-        numeric_columns = [
-
-            "open",
-
-            "high",
-
-            "low",
-
-            "close"
-
-        ]
-
-        for column in numeric_columns:
-
-            df[column] = pd.to_numeric(
-
-                df[column],
-
-                errors="coerce"
-
-            )
-
-        df = df.dropna(
-
-            subset=numeric_columns
-
-        ).reset_index(
-
-            drop=True
-
-        )
-
-        df = self.calculate_indicators(df)
-
-        return df
-
-    # ========================================================
-
-    # RUN STRATEGY
-
-    # ========================================================
-
-    def run(self, data):
-
-        df = self.prepare(data)
-
-        self.signal_history = []
-
-        for i in range(len(df)):
-
-            signal = self.generate_signal(
-
-                df,
-
-                i
-
-            )
-
-            if signal is None:
-
-                signal = self.create_signal()
-
-            signal["index"] = i
-
-            signal["datetime"] = (
-
-                df.iloc[i]["datetime"]
-
-            )
-
-            self.signal_history.append(
-
-                signal
-
-            )
-
-        return (
-
-            df,
-
-            pd.DataFrame(self.signal_history)
-
-        )
-
-# ============================================================
-
-# EXAMPLE PRICE ACTION STRATEGY
-
-# ============================================================
-
-class ExamplePriceActionStrategy(StrategyEngine):
-
-    def __init__(
-
-        self,
-
-        name="Example Price Action Strategy",
-
-        settings=None
-
-    ):
-
-        super().__init__(
-
-            name=name,
-
-            settings=settings
-
-        )
-
-    def generate_signal(
-
-        self,
-
-        data,
-
-        i
-
-    ):
-
-        if i < 200:
-
-            return self.create_signal()
-
-        row = data.iloc[i]
-
-        close = float(row["close"])
-
-        bullish = (
-
-            self.bullish_engulfing(
-
-                data,
-
-                i
-
-            )
-
-            or
-
-            self.bullish_pin_bar(
-
-                data,
-
-                i
-
-            )
-
-        )
-
-        bearish = (
-
-            self.bearish_engulfing(
-
-                data,
-
-                i
-
-            )
-
-            or
-
-            self.bearish_pin_bar(
-
-                data,
-
-                i
-
-            )
-
-        )
-
-        ema200 = row.get(
-
-            "ema_200",
-
-            np.nan
-
-        )
-
-        atr = row.get(
-
-            "atr_14",
-
-            np.nan
-
-        )
-
-        if (
-
-            pd.isna(ema200)
-
-            or pd.isna(atr)
-
-        ):
-
-            return self.create_signal()
-
-        ema200 = float(ema200)
-
-        atr = float(atr)
-
-        # LONG
-
-        if bullish and close > ema200:
-
-            entry = close
-
-            stop_loss = (
-
-                float(row["low"])
-
-                - atr * 0.20
-
-            )
-
-            risk = (
-
-                entry
-
-                - stop_loss
-
-            )
-
-            if risk > 0:
-
-                take_profit = (
-
-                    entry
-
-                    + risk * 2.0
-
-                )
-
-                return self.create_signal(
-
-                    side="LONG",
-
-                    entry=entry,
-
-                    stop_loss=stop_loss,
-
-                    take_profit=take_profit,
-
-                    reason=(
-
-                        "Bullish Price Action "
-
-                        "+ EMA 200"
-
-                    ),
-
-                    confidence=0.75
-
-                )
-
-        # SHORT
-
-        if bearish and close < ema200:
-
-            entry = close
-
-            stop_loss = (
-
-                float(row["high"])
-
-                + atr * 0.20
-
-            )
-
-            risk = (
-
-                stop_loss
-
-                - entry
-
-            )
-
-            if risk > 0:
-
-                take_profit = (
-
-                    entry
-
-                    - risk * 2.0
-
-                )
-
-                return self.create_signal(
-
-                    side="SHORT",
-
-                    entry=entry,
-
-                    stop_loss=stop_loss,
-
-                    take_profit=take_profit,
-
-                    reason=(
-
-                        "Bearish Price Action "
-
-                        "+ EMA 200"
-
-                    ),
-
-                    confidence=0.75
-
-                )
-
-        return self.create_signal()
-
-# ============================================================
-
-# ZIGZAG + EMA STRATEGY
-
-# OPTIMIZED
-
-# ============================================================
-
-class ZigZagStrategy(StrategyEngine):
-
-    """
-
-    Optimized ZigZag strategy.
-
-    Entry logic:
-
-    LONG
-
-    ----
-
-    1. Price above EMA
-
-    2. At least 3 confirmed swing highs
-
-    3. Price breaks the third-most-recent confirmed high
-
-    4. Stop loss below latest confirmed swing low
-
-    SHORT
-
-    -----
-
-    1. Price below EMA
-
-    2. At least 3 confirmed swing lows
-
-    3. Price breaks the third-most-recent confirmed low
-
-    4. Stop loss above latest confirmed swing high
-
-    Important:
-
-    Pivot calculations are prepared ONCE.
-
-    The old version scanned up to 500 candles again
-
-    on every single candle.
-
-    """
-
-    def __init__(
-
-        self,
-
-        name="ZigZag + EMA 200",
-
-        settings=None
-
-    ):
-
-        super().__init__(
-
-            name=name,
-
-            settings=settings
-
-        )
-
-        self.settings = settings or {}
-
-        self.pivot_left = max(
-
-            1,
-
-            int(
-
-                self.settings.get(
-
-                    "pivot_left",
-
-                    2
-
-                )
-
-            )
-
-        )
-
-        self.pivot_right = max(
-
-            1,
-
-            int(
-
-                self.settings.get(
-
-                    "pivot_right",
-
-                    2
-
-                )
-
-            )
-
-        )
-
-        self.risk_reward = max(
-
-            0.1,
-
-            float(
-
-                self.settings.get(
-
-                    "risk_reward",
-
-                    2.0
-
-                )
-
-            )
-
-        )
-
-        self.ma_period = max(
-
-            2,
-
-            int(
-
-                self.settings.get(
-
-                    "ma_period",
-
-                    200
-
-                )
-
-            )
-
-        )
-
-        self.last_broken_high = None
-
-        self.last_broken_low = None
-
-        self._pivot_high_indices = []
-
-        self._pivot_low_indices = []
-
-    # ========================================================
-
-    # PIVOT DETECTION
-
-    # ========================================================
-
-    @staticmethod
-
-    def is_pivot_high(
-
-        data,
-
-        index,
-
-        left=2,
-
-        right=2
-
-    ):
-
-        if index < left:
-
-            return False
-
-        if index + right >= len(data):
-
-            return False
-
-        high = float(
-
-            data.iloc[index]["high"]
-
-        )
-
-        for j in range(
-
-            index - left,
-
-            index + right + 1
-
-        ):
-
-            if j == index:
-
-                continue
-
-            if (
-
-                float(data.iloc[j]["high"])
-
-                >= high
-
-            ):
-
-                return False
-
-        return True
-
-    @staticmethod
-
-    def is_pivot_low(
-
-        data,
-
-        index,
-
-        left=2,
-
-        right=2
-
-    ):
-
-        if index < left:
-
-            return False
-
-        if index + right >= len(data):
-
-            return False
-
-        low = float(
-
-            data.iloc[index]["low"]
-
-        )
-
-        for j in range(
-
-            index - left,
-
-            index + right + 1
-
-        ):
-
-            if j == index:
-
-                continue
-
-            if (
-
-                float(data.iloc[j]["low"])
-
-                <= low
-
-            ):
-
-                return False
-
-        return True
-
-    # ========================================================
-
-    # FAST PIVOT PRECALCULATION
-
-    # ========================================================
-
-    def _calculate_pivots(
-
-        self,
-
-        df
-
-    ):
-
-        n = len(df)
 
         highs = (
 
@@ -1224,614 +876,606 @@ class ZigZagStrategy(StrategyEngine):
 
         )
 
-        pivot_high = np.ones(
+        closes = (
 
-            n,
+            df["close"]
 
-            dtype=bool
+            .astype(float)
 
-        )
-
-        pivot_low = np.ones(
-
-            n,
-
-            dtype=bool
+            .to_numpy()
 
         )
 
-        left = self.pivot_left
-
-        right = self.pivot_right
-
-        # Remove invalid edges
-
-        pivot_high[:left] = False
-
-        pivot_low[:left] = False
-
-        if right > 0:
-
-            pivot_high[n - right:] = False
-
-            pivot_low[n - right:] = False
-
-        # Strict pivot comparison.
-
-        # This preserves the old behavior where equal highs
-
-        # or equal lows do NOT count as pivots.
-
-        for offset in range(
-
-            1,
-
-            left + 1
-
-        ):
-
-            pivot_high[left:n-right] &= (
-
-                highs[left:n-right]
-
-                > highs[left-offset:n-right-offset]
-
-            )
-
-            pivot_low[left:n-right] &= (
-
-                lows[left:n-right]
-
-                < lows[left-offset:n-right-offset]
-
-            )
-
-        for offset in range(
-
-            1,
-
-            right + 1
-
-        ):
-
-            pivot_high[left:n-right] &= (
-
-                highs[left:n-right]
-
-                > highs[left+offset:n-right+offset]
-
-            )
-
-            pivot_low[left:n-right] &= (
-
-                lows[left:n-right]
-
-                < lows[left+offset:n-right+offset]
-
-            )
-
-        df["zigzag_pivot_high"] = pivot_high
-
-        df["zigzag_pivot_low"] = pivot_low
-
-        self._pivot_high_indices = (
-
-            np.flatnonzero(
-
-                pivot_high
-
-            ).astype(int).tolist()
-
-        )
-
-        self._pivot_low_indices = (
-
-            np.flatnonzero(
-
-                pivot_low
-
-            ).astype(int).tolist()
-
-        )
-
-        return df
-
-    # ========================================================
-
-    # PREPARE
-
-    # ========================================================
-
-    def prepare(
-
-        self,
-
-        data
-
-    ):
-
-        df = super().prepare(data)
-
-        # Custom EMA period if not already calculated
-
-        ema_column = (
-
-            f"ema_{self.ma_period}"
-
-        )
-
-        if ema_column not in df.columns:
-
-            df[ema_column] = self.ema(
-
-                df["close"],
-
-                self.ma_period
-
-            )
-
-        # Calculate all ZigZag pivots ONCE
-
-        df = self._calculate_pivots(
-
-            df
-
-        )
-
-        # Reset break memory for new backtest
-
-        self.last_broken_high = None
-
-        self.last_broken_low = None
-
-        return df
-
-    # ========================================================
-
-    # GET CONFIRMED SWINGS - FAST
-
-    # ========================================================
-
-    def _get_confirmed_indices(
-
-        self,
-
-        current_index,
-
-        indices
-
-    ):
-
-        # Pivot at index X becomes available only after
-
-        # pivot_right candles have closed.
-
-        confirmed_index = (
-
-            current_index
-
-            - self.pivot_right
-
-        )
-
-        if confirmed_index < 0:
-
-            return []
-
-        position = bisect_right(
-
-            indices,
-
-            confirmed_index
-
-        )
-
-        return indices[:position]
-
-    # ========================================================
-
-    # GET SWINGS
-
-    # ========================================================
-
-    def get_swings(
-
-        self,
-
-        data,
-
-        current_index
-
-    ):
-
-        confirmed_highs = (
-
-            self._get_confirmed_indices(
-
-                current_index,
-
-                self._pivot_high_indices
-
-            )
-
-        )
-
-        confirmed_lows = (
-
-            self._get_confirmed_indices(
-
-                current_index,
-
-                self._pivot_low_indices
-
-            )
-
-        )
-
-        highs = [
-
-            {
-
-                "index": index,
-
-                "price": float(
-
-                    data.iloc[index]["high"]
-
-                )
-
-            }
-
-            for index in confirmed_highs
-
-        ]
-
-        lows = [
-
-            {
-
-                "index": index,
-
-                "price": float(
-
-                    data.iloc[index]["low"]
-
-                )
-
-            }
-
-            for index in confirmed_lows
-
-        ]
-
-        return highs, lows
-
-    # ========================================================
-
-    # GENERATE SIGNAL
-
-    # ========================================================
-
-    def generate_signal(
-
-        self,
-
-        data,
-
-        i
-
-    ):
-
-        minimum_bars = max(
-
-            self.ma_period,
-
-            self.pivot_left
-
-            + self.pivot_right
-
-            + 10
-
-        )
-
-        if i < minimum_bars:
-
-            return self.create_signal()
-
-        row = data.iloc[i]
-
-        close = float(
-
-            row["close"]
-
-        )
-
-        ema_column = (
-
-            f"ema_{self.ma_period}"
-
-        )
-
-        ma_value = row.get(
-
-            ema_column,
-
-            np.nan
-
-        )
-
-        if pd.isna(ma_value):
-
-            return self.create_signal()
-
-        ma_value = float(ma_value)
-
-        # Get ONLY confirmed swings.
-
-        # No 500-candle rescanning here.
-
-        high_indices = (
-
-            self._get_confirmed_indices(
-
-                i,
-
-                self._pivot_high_indices
-
-            )
-
-        )
-
-        low_indices = (
-
-            self._get_confirmed_indices(
-
-                i,
-
-                self._pivot_low_indices
-
-            )
-
-        )
+        total_bars = len(df)
 
         # ====================================================
 
-        # LONG SETUP
+        # MAIN LOOP
 
         # ====================================================
 
-        if len(high_indices) >= 3:
+        for i in range(total_bars):
 
-            third_high_index = (
+            timestamp = timestamps[i]
 
-                high_indices[-3]
+            open_price = opens[i]
 
-            )
+            high = highs[i]
 
-            third_high_price = float(
+            low = lows[i]
 
-                data.iloc[
+            close = closes[i]
 
-                    third_high_index
+            # ------------------------------------------------
 
-                ]["high"]
+            # EXECUTE PENDING ORDER
 
-            )
-
-            bullish_trend = (
-
-                close > ma_value
-
-            )
-
-            bullish_break = (
-
-                close > third_high_price
-
-            )
+            # ------------------------------------------------
 
             if (
 
-                bullish_trend
+                self.pending_order is not None
 
-                and bullish_break
+                and self.position is None
 
             ):
 
-                # Prevent duplicate signal for same level
+                order = self.pending_order
 
-                if (
+                self.open_position(
 
-                    self.last_broken_high
+                    side=order["side"],
 
-                    != third_high_index
+                    entry=open_price,
 
-                ):
+                    stop_loss=order["stop_loss"],
 
-                    if len(low_indices) > 0:
+                    take_profit=order["take_profit"],
 
-                        latest_low_index = (
+                    timestamp=timestamp
 
-                            low_indices[-1]
+                )
 
-                        )
+                self.pending_order = None
 
-                        stop_loss = float(
+            # ------------------------------------------------
 
-                            data.iloc[
+            # CHECK CURRENT POSITION
 
-                                latest_low_index
+            # ------------------------------------------------
 
-                            ]["low"]
+            if self.position is not None:
 
-                        )
+                self.position[
 
-                        risk = (
+                    "highest_price"
 
-                            close
+                ] = max(
 
-                            - stop_loss
+                    self.position[
 
-                        )
+                        "highest_price"
 
-                        if risk > 0:
+                    ],
 
-                            take_profit = (
+                    high
 
-                                close
+                )
 
-                                + risk
+                self.position[
 
-                                * self.risk_reward
+                    "lowest_price"
 
-                            )
+                ] = min(
 
-                            self.last_broken_high = (
+                    self.position[
 
-                                third_high_index
+                        "lowest_price"
 
-                            )
+                    ],
 
-                            return self.create_signal(
+                    low
 
-                                side="LONG",
+                )
 
-                                entry=close,
+                self.check_exit(
 
-                                stop_loss=stop_loss,
+                    high,
 
-                                take_profit=take_profit,
+                    low,
 
-                                reason=(
+                    timestamp
 
-                                    "ZigZag 3rd High Break "
+                )
 
-                                    f"+ EMA {self.ma_period}"
+            # ------------------------------------------------
 
-                                ),
+            # STRATEGY SIGNAL
 
-                                confidence=0.80
+            # ------------------------------------------------
 
-                            )
+            signal = self.get_signal(
 
-        # ====================================================
+                strategy,
 
-        # SHORT SETUP
+                df,
 
-        # ====================================================
-
-        if len(low_indices) >= 3:
-
-            third_low_index = (
-
-                low_indices[-3]
+                i
 
             )
 
-            third_low_price = float(
+            # ------------------------------------------------
 
-                data.iloc[
+            # OPEN NEW POSITION NEXT BAR
 
-                    third_low_index
-
-                ]["low"]
-
-            )
-
-            bearish_trend = (
-
-                close < ma_value
-
-            )
-
-            bearish_break = (
-
-                close < third_low_price
-
-            )
+            # ------------------------------------------------
 
             if (
 
-                bearish_trend
+                self.position is None
 
-                and bearish_break
+                and signal
+
+                and i < total_bars - 1
 
             ):
 
-                # Prevent duplicate signal for same level
+                side = signal.get(
 
-                if (
+                    "side"
 
-                    self.last_broken_low
+                )
 
-                    != third_low_index
+                if side in [
 
-                ):
+                    "LONG",
 
-                    if len(high_indices) > 0:
+                    "SHORT"
 
-                        latest_high_index = (
+                ]:
 
-                            high_indices[-1]
+                    stop_loss = signal.get(
 
-                        )
+                        "stop_loss"
 
-                        stop_loss = float(
+                    )
 
-                            data.iloc[
+                    take_profit = signal.get(
 
-                                latest_high_index
+                        "take_profit"
 
-                            ]["high"]
+                    )
 
-                        )
+                    if stop_loss is not None:
 
-                        risk = (
+                        self.pending_order = {
 
-                            stop_loss
+                            "side": side,
 
-                            - close
+                            "stop_loss": stop_loss,
 
-                        )
+                            "take_profit": take_profit
 
-                        if risk > 0:
+                        }
 
-                            take_profit = (
+            # ------------------------------------------------
 
-                                close
+            # EQUITY
 
-                                - risk
+            # ------------------------------------------------
 
-                                * self.risk_reward
+            equity = self.calculate_equity(
 
-                            )
+                close
 
-                            self.last_broken_low = (
+            )
 
-                                third_low_index
+            self.equity_curve.append({
 
-                            )
+                "datetime": timestamp,
 
-                            return self.create_signal(
+                "equity": equity
 
-                                side="SHORT",
+            })
 
-                                entry=close,
+        # ====================================================
 
-                                stop_loss=stop_loss,
+        # CLOSE LAST POSITION
 
-                                take_profit=take_profit,
+        # ====================================================
 
-                                reason=(
+        if self.position is not None:
 
-                                    "ZigZag 3rd Low Break "
+            self.close_position(
 
-                                    f"+ EMA {self.ma_period}"
+                closes[-1],
 
-                                ),
+                timestamps[-1],
 
-                                confidence=0.80
+                "End of Data"
 
-                            )
+            )
 
-        return self.create_signal()
+        return self.get_results()
+
+    # ========================================================
+
+    # RESULTS
+
+    # ========================================================
+
+    def get_results(self):
+
+        trades_df = pd.DataFrame(
+
+            self.trades
+
+        )
+
+        equity_df = pd.DataFrame(
+
+            self.equity_curve
+
+        )
+
+        total_trades = len(
+
+            trades_df
+
+        )
+
+        if total_trades == 0:
+
+            return {
+
+                "initial_balance":
+
+                    self.initial_balance,
+
+                "final_balance":
+
+                    self.balance,
+
+                "net_profit":
+
+                    self.balance
+
+                    - self.initial_balance,
+
+                "return_percent":
+
+                    0.0,
+
+                "total_trades":
+
+                    0,
+
+                "winning_trades":
+
+                    0,
+
+                "losing_trades":
+
+                    0,
+
+                "win_rate":
+
+                    0.0,
+
+                "gross_profit":
+
+                    0.0,
+
+                "gross_loss":
+
+                    0.0,
+
+                "profit_factor":
+
+                    0.0,
+
+                "average_win":
+
+                    0.0,
+
+                "average_loss":
+
+                    0.0,
+
+                "expectancy":
+
+                    0.0,
+
+                "average_r":
+
+                    0.0,
+
+                "best_trade":
+
+                    0.0,
+
+                "worst_trade":
+
+                    0.0,
+
+                "max_drawdown":
+
+                    self.calculate_max_drawdown(
+
+                        equity_df
+
+                    ),
+
+                "max_drawdown_money":
+
+                    0.0,
+
+                "recovery_factor":
+
+                    0.0,
+
+                "long_trades":
+
+                    0,
+
+                "short_trades":
+
+                    0,
+
+                "long_win_rate":
+
+                    0.0,
+
+                "short_win_rate":
+
+                    0.0,
+
+                "trades":
+
+                    trades_df,
+
+                "equity_curve":
+
+                    equity_df
+
+            }
+
+        winning = trades_df[
+
+            trades_df["net_pnl"] > 0
+
+        ]
+
+        losing = trades_df[
+
+            trades_df["net_pnl"] < 0
+
+        ]
+
+        winning_trades = len(
+
+            winning
+
+        )
+
+        losing_trades = len(
+
+            losing
+
+        )
+
+        win_rate = (
+
+            winning_trades
+
+            / total_trades
+
+        ) * 100
+
+        gross_profit = float(
+
+            winning["net_pnl"].sum()
+
+        )
+
+        gross_loss = abs(
+
+            float(
+
+                losing["net_pnl"].sum()
+
+            )
+
+        )
+
+        if gross_loss > 0:
+
+            profit_factor = (
+
+                gross_profit
+
+                / gross_loss
+
+            )
+
+        else:
+
+            profit_factor = float("inf")
+
+        net_profit = (
+
+            self.balance
+
+            - self.initial_balance
+
+        )
+
+        return {
+
+            "initial_balance":
+
+                self.initial_balance,
+
+            "final_balance":
+
+                self.balance,
+
+            "net_profit":
+
+                net_profit,
+
+            "return_percent":
+
+                (
+
+                    net_profit
+
+                    / self.initial_balance
+
+                ) * 100,
+
+            "total_trades":
+
+                total_trades,
+
+            "winning_trades":
+
+                winning_trades,
+
+            "losing_trades":
+
+                losing_trades,
+
+            "win_rate":
+
+                win_rate,
+
+            "gross_profit":
+
+                gross_profit,
+
+            "gross_loss":
+
+                gross_loss,
+
+            "profit_factor":
+
+                profit_factor,
+
+            "average_win":
+
+                float(
+
+                    winning["net_pnl"].mean()
+
+                )
+
+                if winning_trades > 0
+
+                else 0.0,
+
+            "average_loss":
+
+                float(
+
+                    losing["net_pnl"].mean()
+
+                )
+
+                if losing_trades > 0
+
+                else 0.0,
+
+            "expectancy":
+
+                float(
+
+                    trades_df["net_pnl"].mean()
+
+                ),
+
+            "average_r":
+
+                float(
+
+                    trades_df["r_multiple"].mean()
+
+                ),
+
+            "best_trade":
+
+                float(
+
+                    trades_df["net_pnl"].max()
+
+                ),
+
+            "worst_trade":
+
+                float(
+
+                    trades_df["net_pnl"].min()
+
+                ),
+
+            "max_drawdown":
+
+                self.calculate_max_drawdown(
+
+                    equity_df
+
+                ),
+
+            "max_drawdown_money":
+
+                0.0,
+
+            "recovery_factor":
+
+                0.0,
+
+            "long_trades":
+
+                int(
+
+                    (
+
+                        trades_df["side"]
+
+                        == "LONG"
+
+                    ).sum()
+
+                ),
+
+            "short_trades":
+
+                int(
+
+                    (
+
+                        trades_df["side"]
+
+                        == "SHORT"
+
+                    ).sum()
+
+                ),
+
+            "long_win_rate":
+
+                0.0,
+
+            "short_win_rate":
+
+                0.0,
+
+            "trades":
+
+                trades_df,
+
+            "equity_curve":
+
+                equity_df
+
+        }
